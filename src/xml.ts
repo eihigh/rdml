@@ -4,12 +4,13 @@ namespace rdml.xml {
 
   // API
   export function parseString(s: string): Node[] {
-    return [];
+    const p = new Parser(s);
+    return p.parse();
   }
 
-  // Types
-  export type Node = Element | string;
+  // Internal
 
+  // XML data structure
   export class Element {
     name: string = "";
     attrs: Attrs = {};
@@ -31,9 +32,10 @@ namespace rdml.xml {
 
   }
 
+  export type Node = Element | string;
+
   export type Attrs = { [attr: string]: string };
 
-  // Internal
   // Parser
   const sp = " ";
   const spCc = sp.charCodeAt(0);
@@ -41,6 +43,10 @@ namespace rdml.xml {
   const ltCc = lt.charCodeAt(0);
   const gt = ">";
   const gtCc = gt.charCodeAt(0);
+  const cr = "\r";
+  const crCc = cr.charCodeAt(0);
+  const lf = "\n";
+  const lfCc = lf.charCodeAt(0);
   const minus = "-";
   const minusCc = minus.charCodeAt(0);
   const slash = "/";
@@ -55,4 +61,221 @@ namespace rdml.xml {
   const doubleQtCc = doubleQt.charCodeAt(0);
   const nameSpacers = "\n\r\t>/= ";
   const whiteSpaces = "\n\r\t ";
+
+  class Parser {
+
+    pos: number = 0;
+    errors: ParseError[] = [];
+
+    constructor(private s: string) { }
+
+    parse(): Node[] {
+      const c = this.parseChildren("");
+      if (this.errors.length > 0) {
+        for (const e of this.errors) {
+          console.error(e.toString());
+        }
+        throw new ParserError(this.errors);
+      }
+      return c;
+    }
+
+    // parsing a list of node
+    parseChildren(parentName: string): Node[] {
+      let children: Node[] = [];
+
+      while (!this.isEOF) {
+
+        // a tag found
+        if (this.curCc === ltCc) {
+          this.pos++;
+
+          // the tag is a closer
+          if (this.curCc === slashCc) {
+            this.pos++;
+            const start = this.pos;
+            this.seekTo(gt);
+            const name = this.slice(start);
+            if (name !== parentName) {
+              this.pushError(`tag names mismatched; open='${parentName}', 'close=${name}'`);
+            }
+            return children;
+          }
+
+          // the tag is a comment (doctype is not supported)
+          // special rule: tag beginning with ! is always a comment.
+          if (this.curCc === exclCc) {
+            this.seekTo(gt);
+            this.pos++;
+            continue;
+          }
+
+          // the tag is an opener
+          children.push(this.parseElement());
+          this.pos++;
+          continue;
+        }
+
+        // special case: script tag
+        if (parentName === "script") {
+          children.push(this.parseScript());
+          continue;
+        }
+
+        // text node
+        const text = this.parseText();
+        if (text !== "") {
+          children.push(text);
+        }
+      }
+
+      return children;
+    }
+
+    parseText() {
+      const start = this.pos;
+      this.seekTo(lt);
+      return this.slice(start);
+    }
+
+    parseScript() {
+      const start = this.pos;
+      this.pos = this.s.indexOf("</script>", this.pos);
+      return this.slice(start);
+    }
+
+    parseElement() {
+      let el = new Element();
+
+      // get element's name
+      el.name = this.parseName();
+      if (el.name === "") {
+        this.pushError(`invalid element name`);
+      }
+      this.skipSp();
+
+      // get attributes
+      while (!this.isEOF) {
+
+        // get attribute's name
+        const attr = this.parseName();
+        if (attr === "") {
+          this.pushError("");
+        }
+        this.skipSp();
+
+        // the attribute must be followed by =
+        if (this.curCc !== equalCc) {
+          this.pushError(`attribute '${attr}' must be followed by '='`);
+        }
+        this.skipSp();
+
+        // the value must be wrapped by quotations
+        if (this.curCc !== singleQtCc && this.curCc !== doubleQtCc) {
+          this.pushError(`attribute's value must be wrapped by ' or "`);
+
+        } else {
+          const qt = this.curCh;
+          this.pos++;
+          const start = this.pos;
+          this.seekTo(qt);
+          const value = this.slice(start);
+          this.pos++;
+
+          if (this.isOk) {
+            el.attrs[attr] = value;
+          }
+        }
+
+        this.skipSp();
+
+        // end of element
+        switch (this.curCc) {
+          case gtCc: // closing
+            this.pos++;
+            el.childNodes = this.parseChildren(el.name);
+            break;
+
+          case slashCc: // empty tag
+            this.seekTo(gt);
+            this.pos++;
+            break;
+        }
+      }
+
+      // throw error if reaches EOF without closing the element
+
+      return el;
+    }
+
+    // parse some name
+    parseName() {
+      const start = this.pos;
+      while (nameSpacers.indexOf(this.curCh) === -1 && !this.isEOF) {
+        this.pos++;
+      }
+      return this.slice(start);
+    }
+
+    // helper methods
+    get curCh() {
+      return this.s[this.pos];
+    }
+
+    get curCc() {
+      return this.s.charCodeAt(this.pos);
+    }
+
+    get isEOF() {
+      return this.curCh === undefined;
+    }
+
+    get isOk() {
+      return this.errors.length === 0;
+    }
+
+    slice(start: number) {
+      return this.s.slice(start, this.pos);
+    }
+
+    seekTo(ch: string) {
+      this.pos = this.s.indexOf(ch, this.pos);
+      if (this.pos === -1) { this.pos = this.s.length; }
+    }
+
+    skipSp() {
+      while (this.curCh === sp && !this.isEOF) {
+        this.pos++;
+      }
+    }
+
+    pushError(message: string) {
+      this.errors.push(new ParseError(message));
+    }
+  }
+
+  class AttrError implements Error {
+    public name = "AttributeError";
+    public message = "";
+  }
+
+  class ParseError implements Error {
+    public name = "XmlParseError";
+    constructor(public message: string) { }
+
+    toString() {
+      return `${this.name}: ${this.message}`;
+    }
+  }
+
+  class ParserError implements Error {
+    public name = "XmlParserError"
+    public message: string = "";
+    constructor(errors: ParseError[]) {
+      this.message = `${errors.length} error(s) thrown.`;
+    }
+    toString() {
+      return `${this.name}: ${this.message}`;
+    }
+  }
 }
