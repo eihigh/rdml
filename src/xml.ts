@@ -71,10 +71,7 @@ namespace rdml.xml {
 
     parse(): Node[] {
       const c = this.parseChildren("");
-      if (this.errors.length > 0) {
-        for (const e of this.errors) {
-          console.error(e.toString());
-        }
+      if (!this.isOk) {
         throw new ParserError(this.errors);
       }
       return c;
@@ -84,20 +81,56 @@ namespace rdml.xml {
     parseChildren(parentName: string): Node[] {
       let children: Node[] = [];
 
+      // special case: script tag
+      // script tag has no children except the script.
+      if (parentName === "script") {
+        children.push(this.parseScript());
+        return children;
+      }
+
       while (!this.isEOF) {
 
         // a tag found
         if (this.curCc === ltCc) {
           this.pos++;
 
-          // the tag is a closer
+          switch (this.curCc) {
+            case 0: // EOF
+              this.pushError(`unclosed tag`);
+              return children;
+
+            case slashCc: // closing tag
+              return children;
+
+            case exclCc: // comment
+              continue;
+
+            default: // opening tag
+              children.push(this.parseElement());
+          }
+
+        } else {
+          // text node
+          const text = this.parseText();
+          if (text !== "") {
+            children.push(text);
+          }
+        }
+
+        {
+          if (this.isEOF) {
+            this.pushError(`syntax error`);
+            return children;
+          }
+
+          // closing tag
           if (this.curCc === slashCc) {
             this.pos++;
             const start = this.pos;
             this.seekTo(gt);
             const name = this.slice(start);
             if (name !== parentName) {
-              this.pushError(`tag names mismatched; open='${parentName}', 'close=${name}'`);
+              this.pushError(`tag names mismatched. open='${parentName}', 'close=${name}'`);
             }
             return children;
           }
@@ -110,26 +143,26 @@ namespace rdml.xml {
             continue;
           }
 
-          // the tag is an opener
+          // opening tag
           children.push(this.parseElement());
           this.pos++;
           continue;
         }
-
-        // special case: script tag
-        if (parentName === "script") {
-          children.push(this.parseScript());
-          continue;
-        }
-
-        // text node
-        const text = this.parseText();
-        if (text !== "") {
-          children.push(text);
-        }
       }
 
+      // expected closing tag, found EOF
+      if (parentName !== "") {
+        this.pushError(`closing tag </${parentName}> not found`);
+      }
       return children;
+    }
+
+    parseComment() {
+      this.seekTo(gt);
+      if (this.isEOF) {
+        this.pushError(`unclosed comment`);
+      }
+      return;
     }
 
     parseText() {
@@ -150,21 +183,30 @@ namespace rdml.xml {
       // get element's name
       el.name = this.parseName();
       if (el.name === "") {
-        this.pushError(`invalid element name`);
+        this.pushError(`element name not found`);
       }
       this.skipSp();
 
-      // end of tag
+      if (this.isEOF) {
+        this.pushError(`found EOF without closing`);
+        return el;
+      }
+
+      // tag closed with no attributes
       switch (this.curCc) {
-        case gtCc: // closing
+        case gtCc:
           this.pos++;
           el.childNodes = this.parseChildren(el.name);
           return el;
 
-        case slashCc: // empty tag
+        case slashCc:
           this.seekTo(gt);
           this.pos++;
           return el;
+      }
+
+      if (!this.isOk) {
+        return el;
       }
 
       // get attributes
@@ -173,7 +215,7 @@ namespace rdml.xml {
         // get attribute's name
         const attr = this.parseName();
         if (attr === "") {
-          this.pushError("");
+          this.pushError(`syntax error`);
         }
         this.skipSp();
 
@@ -253,7 +295,12 @@ namespace rdml.xml {
 
     seekTo(ch: string) {
       this.pos = this.s.indexOf(ch, this.pos);
-      if (this.pos === -1) { this.pos = this.s.length; }
+      if (this.pos === -1) {
+        this.pushError(`next '${ch}' not found`);
+        this.pos = this.s.length;
+        return false;
+      }
+      return true;
     }
 
     skipSp() {
@@ -275,20 +322,17 @@ namespace rdml.xml {
   class ParseError implements Error {
     public name = "XmlParseError";
     constructor(public message: string) { }
-
-    toString() {
-      return `${this.name}: ${this.message}`;
-    }
   }
 
   class ParserError implements Error {
     public name = "XmlParserError"
-    public message: string = "";
+    public message: string;
+
     constructor(errors: ParseError[]) {
       this.message = `${errors.length} error(s) thrown.`;
-    }
-    toString() {
-      return `${this.name}: ${this.message}`;
+      errors.map(e => {
+        this.message += "<br>\r\n" + e.message;
+      });
     }
   }
 }
