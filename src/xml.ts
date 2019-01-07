@@ -154,6 +154,19 @@ namespace rdml.xml {
       }
       this.skipSp();
 
+      // end of tag
+      switch (this.curCc) {
+        case gtCc: // closing
+          this.pos++;
+          el.childNodes = this.parseChildren(el.name);
+          return el;
+
+        case slashCc: // empty tag
+          this.seekTo(gt);
+          this.pos++;
+          return el;
+      }
+
       // get attributes
       while (!this.isEOF) {
 
@@ -189,17 +202,17 @@ namespace rdml.xml {
 
         this.skipSp();
 
-        // end of element
+        // end of tag
         switch (this.curCc) {
           case gtCc: // closing
             this.pos++;
             el.childNodes = this.parseChildren(el.name);
-            break;
+            return el;
 
           case slashCc: // empty tag
             this.seekTo(gt);
             this.pos++;
-            break;
+            return el;
         }
       }
 
