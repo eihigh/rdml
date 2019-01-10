@@ -8,6 +8,14 @@ namespace rdml.xml {
     return p.parse();
   }
 
+  export function nodesToString(nodes: Node[]): string {
+    return JSON.stringify(
+      nodes.map((node) => {
+        return typeof node === "string" ? node : node.toJSON();
+      })
+    )
+  }
+
   // Internal
 
   // XML data structure
@@ -357,8 +365,24 @@ const str = `
 <p><q>lorem ipsum</q></p>
 `
 
+const expect = [
+  "\n",
+  {
+    name: "p",
+    __attrs: {},
+    childNodes: [
+      {
+        name: "q",
+        __attrs: {},
+        childNodes: ["lorem ipsum"]
+      }
+    ]
+  },
+  "\n",
+]
+
+
 const nodes = rdml.xml.parseString(str);
-nodes.map((node) => {
-  console.log(node.toString());
-})
-console.dir(nodes);
+console.log(JSON.stringify(expect));
+console.log(rdml.xml.nodesToString(nodes));
+console.log(rdml.xml.nodesToString(nodes) === JSON.stringify(expect));
