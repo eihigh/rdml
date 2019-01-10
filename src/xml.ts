@@ -86,7 +86,7 @@ namespace rdml.xml {
       let textFrom = this.pos;
       while (!this.isEOF) {
 
-        const last = this.pos;
+        const textTo = this.pos; // just before the tag
 
         // a tag found
         if (this.curCc === ltCc) {
@@ -111,16 +111,15 @@ namespace rdml.xml {
 
             case slashCc: // end tag
               this.pos++;
-              const lasta = this.pos;
               const name = this.parseName();
 
               if (name !== "" && name === parentName) {
                 if (parentName === "script") {
                   // dispose child nodes.
-                  const script = this.s.slice(start, lasta);
+                  const script = this.s.slice(start, textTo);
                   nodes = [script];
                 }
-                const text = this.s.slice(textFrom, last);
+                const text = this.s.slice(textFrom, textTo);
                 if (text !== "") {
                   nodes.push(text);
                 }
@@ -132,7 +131,7 @@ namespace rdml.xml {
             default: // start tag
               const element = this.parseElement();
               if (element !== null) { // parsing success
-                const text = this.s.slice(textFrom, last);
+                const text = this.s.slice(textFrom, textTo);
                 if (text !== "") {
                   nodes.push(text);
                 }
