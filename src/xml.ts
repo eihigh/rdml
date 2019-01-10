@@ -61,6 +61,7 @@ namespace rdml.xml {
   const doubleQtCc = doubleQt.charCodeAt(0);
   const nameSpacers = "\n\r\t>/= ";
   const whiteSpaces = "\n\r\t ";
+  const eof = 0;
 
   class Parser {
 
@@ -70,7 +71,7 @@ namespace rdml.xml {
     constructor(private s: string) { }
 
     parse(): Node[] {
-      const c = this.parseChildren("");
+      const c = this.parseNodes("");
       if (!this.isOk) {
         throw new ParserError(this.errors);
       }
@@ -78,83 +79,73 @@ namespace rdml.xml {
     }
 
     // parsing a list of node
-    parseChildren(parentName: string): Node[] {
-      let children: Node[] = [];
+    parseNodes(parentName: string): Node[] {
+      let nodes: Node[] = [];
 
       // special case: script tag
       // script tag has no children except the script.
       if (parentName === "script") {
-        children.push(this.parseScript());
-        return children;
+        nodes.push(this.parseScript());
+        return nodes;
       }
 
+      let first = this.pos;
       while (!this.isEOF) {
 
         // a tag found
         if (this.curCc === ltCc) {
           this.pos++;
 
+          this.skipSp();
           switch (this.curCc) {
-            case 0: // EOF
+            case eof:
               this.pushError(`unclosed tag`);
-              return children;
+              return nodes;
 
-            case slashCc: // closing tag
-              return children;
+            // ! is always comment. doctype is ignored.
+            case exclCc:
 
-            case exclCc: // comment
-              continue;
+            case slashCc: // end tag
+              this.pos++;
+              const name = this.parseName();
+              if (name !== "" && name === parentName) {
+                const text = this.slice(first);
+                if (text !== "") {
+                  nodes.push(text);
+                }
+                return nodes;
+              }
+              break;
 
-            default: // opening tag
-              children.push(this.parseElement());
-          }
-
-        } else {
-          // text node
-          const text = this.parseText();
-          if (text !== "") {
-            children.push(text);
+            default: // start tag
+              const last = this.pos;
+              const element = this.parseElement();
+              if (element !== null) { // parsing success
+                const text = this.s.slice(first, last);
+                if (text !== "") {
+                  nodes.push(text);
+                }
+                nodes.push(element);
+                first = this.pos; // next
+              }
+              break;
           }
         }
 
-        {
-          if (this.isEOF) {
-            this.pushError(`syntax error`);
-            return children;
-          }
-
-          // closing tag
-          if (this.curCc === slashCc) {
-            this.pos++;
-            const start = this.pos;
-            this.seekTo(gt);
-            const name = this.slice(start);
-            if (name !== parentName) {
-              this.pushError(`tag names mismatched. open='${parentName}', 'close=${name}'`);
-            }
-            return children;
-          }
-
-          // the tag is a comment (doctype is not supported)
-          // special rule: tag beginning with ! is always a comment.
-          if (this.curCc === exclCc) {
-            this.seekTo(gt);
-            this.pos++;
-            continue;
-          }
-
-          // opening tag
-          children.push(this.parseElement());
-          this.pos++;
-          continue;
-        }
       }
 
       // expected closing tag, found EOF
       if (parentName !== "") {
         this.pushError(`closing tag </${parentName}> not found`);
+        return nodes;
       }
-      return children;
+
+      const text = this.slice(first);
+      if (text !== "") {
+        nodes.push(text);
+      }
+      return nodes;
+
     }
 
     parseComment() {
@@ -196,7 +187,7 @@ namespace rdml.xml {
       switch (this.curCc) {
         case gtCc:
           this.pos++;
-          el.childNodes = this.parseChildren(el.name);
+          el.childNodes = this.parseNodes(el.name);
           return el;
 
         case slashCc:
@@ -248,7 +239,7 @@ namespace rdml.xml {
         switch (this.curCc) {
           case gtCc: // closing
             this.pos++;
-            el.childNodes = this.parseChildren(el.name);
+            el.childNodes = this.parseNodes(el.name);
             return el;
 
           case slashCc: // empty tag
