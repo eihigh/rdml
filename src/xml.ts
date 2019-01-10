@@ -81,16 +81,12 @@ namespace rdml.xml {
     // parsing a list of node
     parseNodes(parentName: string): Node[] {
       let nodes: Node[] = [];
+      const start = this.pos;
 
-      // special case: script tag
-      // script tag has no children except the script.
-      if (parentName === "script") {
-        nodes.push(this.parseScript());
-        return nodes;
-      }
-
-      let first = this.pos;
+      let textFrom = this.pos;
       while (!this.isEOF) {
+
+        const last = this.pos;
 
         // a tag found
         if (this.curCc === ltCc) {
@@ -104,34 +100,51 @@ namespace rdml.xml {
 
             // ! is always comment. doctype is ignored.
             case exclCc:
+              const text = this.slice(textFrom);
+              if (text !== "") {
+                nodes.push(text);
+              }
+              this.seekTo(gt);
+              this.pos++;
+              textFrom = this.pos;
+              break;
 
             case slashCc: // end tag
               this.pos++;
+              const lasta = this.pos;
               const name = this.parseName();
+
               if (name !== "" && name === parentName) {
-                const text = this.slice(first);
+                if (parentName === "script") {
+                  // dispose child nodes.
+                  const script = this.s.slice(start, lasta);
+                  nodes = [script];
+                }
+                const text = this.s.slice(textFrom, last);
                 if (text !== "") {
                   nodes.push(text);
                 }
+                this.pos++;
                 return nodes;
               }
               break;
 
             default: // start tag
-              const last = this.pos;
               const element = this.parseElement();
               if (element !== null) { // parsing success
-                const text = this.s.slice(first, last);
+                const text = this.s.slice(textFrom, last);
                 if (text !== "") {
                   nodes.push(text);
                 }
                 nodes.push(element);
-                first = this.pos; // next
+                textFrom = this.pos; // next
               }
               break;
           }
-        }
 
+        } else {
+          this.pos++;
+        }
       }
 
       // expected closing tag, found EOF
@@ -140,7 +153,7 @@ namespace rdml.xml {
         return nodes;
       }
 
-      const text = this.slice(first);
+      const text = this.slice(textFrom);
       if (text !== "") {
         nodes.push(text);
       }
@@ -327,3 +340,8 @@ namespace rdml.xml {
     }
   }
 }
+
+const str = `
+<p></p>
+`
+console.dir(rdml.xml.parseString(str));
