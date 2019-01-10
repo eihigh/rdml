@@ -30,6 +30,20 @@ namespace rdml.xml {
       return s;
     }
 
+    toJSON(): any {
+      return {
+        name: this.name,
+        __attrs: this.attrs,
+        childNodes: this.childNodes.map((node) => {
+          return typeof node === "string" ? node : node.toJSON();
+        })
+      }
+    }
+
+    // toString returns JSON-compatible string.
+    toString(): string {
+      return JSON.stringify(this.toJSON());
+    }
   }
 
   export type Node = Element | string;
@@ -95,8 +109,7 @@ namespace rdml.xml {
           this.skipSp();
           switch (this.curCc) {
             case eof:
-              this.pushError(`unclosed tag`);
-              return nodes;
+              break;
 
             // ! is always comment. doctype is ignored.
             case exclCc:
@@ -341,6 +354,11 @@ namespace rdml.xml {
 }
 
 const str = `
-<p></p>
+<p><q>lorem ipsum</q></p>
 `
-console.dir(rdml.xml.parseString(str));
+
+const nodes = rdml.xml.parseString(str);
+nodes.map((node) => {
+  console.log(node.toString());
+})
+console.dir(nodes);
