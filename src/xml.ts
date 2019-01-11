@@ -8,14 +8,6 @@ namespace rdml.xml {
     return p.parse();
   }
 
-  export function nodesToString(nodes: Node[]): string {
-    return JSON.stringify(
-      nodes.map((node) => {
-        return typeof node === "string" ? node : node.toJSON();
-      })
-    )
-  }
-
   // Internal
 
   // XML data structure
@@ -36,21 +28,6 @@ namespace rdml.xml {
         }
       }
       return s;
-    }
-
-    toJSON(): any {
-      return {
-        name: this.name,
-        __attrs: this.attrs,
-        childNodes: this.childNodes.map((node) => {
-          return typeof node === "string" ? node : node.toJSON();
-        })
-      }
-    }
-
-    // toString returns JSON-compatible string.
-    toString(): string {
-      return JSON.stringify(this.toJSON());
     }
   }
 
@@ -382,7 +359,7 @@ const expect = [
 ]
 
 
+console.time('parse');
 const nodes = rdml.xml.parseString(str);
-console.log(JSON.stringify(expect));
-console.log(rdml.xml.nodesToString(nodes));
-console.log(rdml.xml.nodesToString(nodes) === JSON.stringify(expect));
+console.timeEnd('parse');
+console.log(JSON.stringify(nodes));
