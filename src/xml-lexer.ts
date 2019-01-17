@@ -30,7 +30,7 @@ namespace rdml.lexer {
 
   type stateFn = (() => stateFn) | null;
 
-  enum items {
+  enum itemType {
     eof = 0,
     lt,
     gt,
@@ -44,7 +44,7 @@ namespace rdml.lexer {
 
   class Item {
     constructor(
-      public typ: items,
+      public typ: itemType,
       public start: number,
       public end: number
     ) { }
@@ -54,20 +54,30 @@ namespace rdml.lexer {
 
     pos: number = 0;
     from: number = 0;
+    width: number = 0;
     items: Item[] = [];
 
     constructor(public s: string) { }
 
-    next() {
-      this.pos++;
-      return this.s[this.pos];
-    }
-
     peek() {
-      return this.next();
+      const c = this.s[this.pos].charCodeAt(0);
+      // check surrogate pair
+      this.width = (0xD800 <= c && c <= 0xDBFF) || (0xDC00 <= c && c <= 0xDFFF) ? 2 : 1;
+      const ch = this.s.slice(this.pos, this.pos + this.width);
+      return ch;
     }
 
-    emit(typ: items) {
+    next() {
+      const ch = this.peek();
+      this.ensure();
+      return ch;
+    }
+
+    ensure() {
+      this.pos += this.width;
+    }
+
+    emit(typ: itemType) {
       this.items.push(new Item(typ, this.from, this.pos));
       this.from = this.pos;
     }
@@ -91,28 +101,44 @@ namespace rdml.lexer {
         if (ch === lt) {
           if (this.peek() === slash) {
             this.next();
-            this.emit(items.eof);
-            return this.lexEndTag();
+            this.emit(itemType.eof);
+            return this.lexEndTag;
           } else {
-            this.emit(items.eof);
+            this.emit(itemType.eof);
             return this.lexStartTag;
           }
         }
 
         ch = this.next();
       }
-      return this.lexNode;
+      return this.lexNodes;
     }
 
     lexStartTag() {
+      this.pos += lt.length;
+      this.emit(itemType.lt);
+      const ch = this.peek();
+      if (ch === slash) {
+        this.ensure();
+        return this.lexEndTag;
+      }
       return null;
     }
 
     lexEndTag() {
+      this.pos += slash.length;
+      this.emit(itemType.slash);
+      while (this.isEOF) {
+        const ch = this.next();
+        if (ch === gt) {
+          this.emit(itemType.gt);
+          return this.lexNodes;
+        }
+      }
       return null;
     }
 
-    lexNode() {
+    lexNodes() {
       return null;
     }
   }
