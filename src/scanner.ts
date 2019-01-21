@@ -4,6 +4,8 @@ namespace rdml.scanner {
 
   const sp = " ";
   const spCc = sp.charCodeAt(0);
+  const wsp = "　";
+  const wspCc = wsp.charCodeAt(0);
   const tab = "\t";
   const tabCc = tab.charCodeAt(0);
   const lt = "<";
@@ -26,8 +28,6 @@ namespace rdml.scanner {
   const singleQtCc = singleQt.charCodeAt(0);
   const doubleQt = '"';
   const doubleQtCc = doubleQt.charCodeAt(0);
-  const whiteSpaces = "\n\r\t 　";
-  const nameSpacers = ">/=" + whiteSpaces;
   const eof = 0;
 
   enum ItemType {
@@ -55,15 +55,19 @@ namespace rdml.scanner {
     ) { }
   }
 
-  type stateFn = (() => stateFn) | null;
+  type stateFn = ((this: Scanner) => stateFn) | null;
 
-  class Scanner {
+  export class Scanner {
     src: string = "";   // source
     cc: number = 0;     // current charCode; surrogate pair ignored
     start: number = 0;  // token start offset
     offset: number = 0; // charcter offset
     width: number = 0;  // charcter width
     items: Item[] = [];
+
+    constructor(src: string) {
+      this.src = src;
+    }
 
     next() {
       if (this.src.length <= this.offset) {
@@ -89,6 +93,8 @@ namespace rdml.scanner {
     get isSpace() {
       switch (this.cc) {
         case spCc:
+        case wspCc:
+        case crCc:
         case lfCc:
         case tabCc:
           return true;
@@ -97,6 +103,7 @@ namespace rdml.scanner {
     }
 
     get isNamespacer() {
+      if (this.isSpace) { return true; }
       switch (this.cc) {
         case gtCc:
         case slashCc:
@@ -111,6 +118,7 @@ namespace rdml.scanner {
     }
 
     scanText() {
+      console.log(this);
       while (!this.isEOF) {
         if (this.cc === ltCc) {
           return this.scanTag;
@@ -137,13 +145,13 @@ namespace rdml.scanner {
     }
 
     scanLeftEndTag() {
-      while (this.cc > 0) {
-        if (true/*if namespacer*/) {
-          this.emit(ItemType.elemName);
+      while (!this.isEOF) {
+        if (this.isNamespacer) {
           break;
         }
         this.next();
       }
+      this.emit(ItemType.elemName);
       return null;
     }
 
@@ -163,7 +171,7 @@ namespace rdml.scanner {
 
     scanStartTag() {
       while (!this.isEOF) {
-        if (this.isSpace || this.isNamespacer) {
+        if (this.isNamespacer) {
           if (this.start === this.offset) {
             throw new Error(`tag name not found`);
           }
@@ -207,7 +215,7 @@ namespace rdml.scanner {
 
     scanAttrName() {
       while (!this.isEOF) {
-        if (this.isSpace || this.isNamespacer) {
+        if (this.isNamespacer) {
           this.emit(ItemType.attr);
           return this.scanAttributes;
         }
@@ -230,3 +238,10 @@ namespace rdml.scanner {
     }
   }
 }
+
+const src = `lorem ipsum`;
+let s = new rdml.scanner.Scanner(src);
+console.log(s);
+s.run();
+console.dir(s);
+console.log(JSON.stringify(s.items));
