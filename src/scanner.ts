@@ -32,12 +32,15 @@ namespace rdml.scanner {
     invalid = 0,
     eof,
     text,
+
     leftStartTag,
-    tagName,
-    attrName,
+    elemName,
+    attr,
     equal,
-    attrValue,
+    value,
     rightStartTag,
+    rightEmptyTag,
+
     leftEndTag,
     rightEndTag,
   }
@@ -75,21 +78,44 @@ namespace rdml.scanner {
     }
 
     run() {
-      let state: stateFn = this.scanDocument;
+      let state: stateFn = this.scanText;
       while (state !== null) {
         state = state();
       }
     }
 
-    get isEOF() {
-      return this.cc >= 0;
+    get isSpace() {
+      switch (this.cc) {
+        case spCc:
+        case lfCc:
+          return true;
+      }
+      return false;
     }
 
-    scanDocument() {
+    get isNamespacer() {
+      switch (this.cc) {
+        case gtCc:
+        case slashCc:
+        case equalCc:
+          return true;
+      }
+      return false;
+    }
+
+    get isEOF() {
+      return this.cc <= 0;
+    }
+
+    scanText() {
       while (!this.isEOF) {
         if (this.cc === ltCc) {
           return this.scanTag;
         }
+        this.next();
+      }
+      if (this.start < this.offset) {
+        this.emit(ItemType.text);
       }
       this.emit(ItemType.eof);
       return null;
@@ -102,13 +128,15 @@ namespace rdml.scanner {
         this.emit(ItemType.leftEndTag);
         return this.scanLeftEndTag;
       }
-      return null;
+
+      this.emit(ItemType.leftStartTag);
+      return this.scanStartTag;
     }
 
     scanLeftEndTag() {
       while (this.cc > 0) {
         if (true/*if namespacer*/) {
-          this.emit(ItemType.tagName);
+          this.emit(ItemType.elemName);
           break;
         }
         this.next();
@@ -120,12 +148,80 @@ namespace rdml.scanner {
       while (this.cc > 0) {
         if (this.cc === gtCc) {
           this.next();
-          return this.scanDocument;
+          return this.scanText;
         }
         if (true/*not whitespace*/) {
           this.next();
         }
         this.next();
+      }
+      return null;
+    }
+
+    scanStartTag() {
+      while (!this.isEOF) {
+        if (this.isSpace || this.isNamespacer) {
+          if (this.start === this.offset) {
+            throw new Error(`tag name not found`);
+          }
+          this.emit(ItemType.elemName);
+          return this.scanAttributes;
+        }
+      }
+      this.emit(ItemType.eof);
+      return null;
+    }
+
+    scanAttributes(): stateFn {
+      while (this.isSpace) {
+        this.next();
+      }
+      this.start = this.offset;
+      switch (this.cc) {
+        case gtCc:
+          this.emit(ItemType.rightStartTag);
+          return this.scanText;
+
+        case slashCc:
+          this.next(); // consume '/'
+          if (this.cc !== gtCc) {
+            // error 'expected />'
+          }
+          this.emit(ItemType.rightEmptyTag);
+          return this.scanText;
+
+        case equalCc:
+          this.next(); // consume '='
+          this.emit(ItemType.equal);
+          return this.scanAttributes;
+
+        case doubleQtCc:
+        case singleQtCc:
+          return this.scanValue;
+      }
+      return this.scanAttrName;
+    }
+
+    scanAttrName() {
+      while (!this.isEOF) {
+        if (this.isSpace || this.isNamespacer) {
+          this.emit(ItemType.attr);
+          return this.scanAttributes;
+        }
+        this.next();
+      }
+      return null;
+    }
+
+    scanValue() {
+      const symbol = this.cc; // ' or "
+      this.next(); // consume quotation
+      while (!this.isEOF) {
+        if (this.cc === symbol) {
+          this.emit(ItemType.value);
+          this.next(); // consume quotation
+          return this.scanAttributes;
+        }
       }
       return null;
     }
