@@ -4,6 +4,8 @@ namespace rdml.scanner {
 
   const sp = " ";
   const spCc = sp.charCodeAt(0);
+  const tab = "\t";
+  const tabCc = tab.charCodeAt(0);
   const lt = "<";
   const ltCc = lt.charCodeAt(0);
   const gt = ">";
@@ -88,6 +90,7 @@ namespace rdml.scanner {
       switch (this.cc) {
         case spCc:
         case lfCc:
+        case tabCc:
           return true;
       }
       return false;
