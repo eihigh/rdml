@@ -57,6 +57,14 @@ namespace rdml {
 
   type stateFn = ((this: Scanner) => stateFn) | null;
 
+  class ScanError implements Error {
+    name = "Scan Error";
+    message: string;
+    constructor(msg: string, pos: number) {
+      this.message = `${this.name}: ${msg} at ${pos}`
+    }
+  }
+
   export class Scanner {
     src: string = "";   // source
     cc: number = 0;     // current charCode; surrogate pair ignored
@@ -64,18 +72,20 @@ namespace rdml {
     offset: number = 0; // charcter offset
     width: number = 0;  // charcter width
     items: Item[] = [];
+    err: ScanError | null = null;
 
     constructor(src: string) {
       this.src = src;
+      if (src.length > 0) { this.cc = src.charCodeAt(0); }
     }
 
     next() {
+      this.offset += 1;
       if (this.src.length <= this.offset) {
         this.cc = -1;
         return;
       }
       this.cc = this.src.charCodeAt(this.offset);
-      this.offset += 1;
     }
 
     emit(typ: ItemType) {
@@ -87,6 +97,25 @@ namespace rdml {
       let state: stateFn = this.scanText;
       while (state !== null) {
         state = state.call(this);
+      }
+      if (this.err !== null) {
+        console.log(this.err.message);
+      }
+    }
+
+    fail(msg: string) {
+      this.emit(ItemType.invalid);
+      this.err = new ScanError(msg, this.offset);
+      return null;
+    }
+
+    ignoreSpaces() {
+      while (!this.isEOF) {
+        if (!this.isSpace) {
+          break;
+        }
+        this.next();
+        this.start = this.offset;
       }
     }
 
@@ -131,6 +160,9 @@ namespace rdml {
     scanText() {
       while (!this.isEOF) {
         if (this.cc === ltCc) {
+          if (this.start < this.offset) {
+            this.emit(ItemType.text);
+          }
           return this.scanTag;
         }
         this.next();
@@ -142,7 +174,7 @@ namespace rdml {
       return null;
     }
 
-    scanTag() {
+    scanTag(): stateFn {
       this.next(); // consume '<'
       if (this.cc === slashCc) {
         this.next(); // consume '/'
@@ -157,24 +189,28 @@ namespace rdml {
     scanLeftEndTag() {
       while (!this.isEOF) {
         if (this.isNamespacer) {
-          break;
+          this.emit(ItemType.elemName);
+          return this.scanRightEndTag;
         }
         this.next();
       }
-      this.emit(ItemType.elemName);
       return null;
     }
 
     scanRightEndTag() {
-      while (this.cc > 0) {
+      while (!this.isEOF) {
         if (this.cc === gtCc) {
-          this.next();
+          this.next(); // consume '>'
+          this.emit(ItemType.rightEndTag);
           return this.scanText;
         }
-        if (true/*not whitespace*/) {
-          this.next();
+        if (!this.isSpace) {
+          return this.fail(`expected '>'`);
         }
+
+        // consume and ignore space
         this.next();
+        this.start = this.offset;
       }
       return null;
     }
@@ -182,74 +218,70 @@ namespace rdml {
     scanStartTag() {
       while (!this.isEOF) {
         if (this.isNamespacer) {
-          if (this.start === this.offset) {
-            throw new Error(`tag name not found`);
-          }
           this.emit(ItemType.elemName);
-          return this.scanAttributes;
+          return this.scanAttribute;
         }
-      }
-      this.emit(ItemType.eof);
-      return null;
-    }
-
-    scanAttributes(): stateFn {
-      while (this.isSpace) {
         this.next();
       }
-      this.start = this.offset;
-      switch (this.cc) {
-        case gtCc:
-          this.emit(ItemType.rightStartTag);
-          return this.scanText;
-
-        case slashCc:
-          this.next(); // consume '/'
-          if (this.cc !== gtCc) {
-            // error 'expected />'
-          }
-          this.emit(ItemType.rightEmptyTag);
-          return this.scanText;
-
-        case equalCc:
-          this.next(); // consume '='
-          this.emit(ItemType.equal);
-          return this.scanAttributes;
-
-        case doubleQtCc:
-        case singleQtCc:
-          return this.scanValue;
-      }
-      return this.scanAttrName;
+      return this.fail(`unclosed tag`);
     }
 
-    scanAttrName() {
+    scanAttribute(): stateFn {
+      this.ignoreSpaces();
+      switch (this.cc) {
+        case slashCc:
+          this.next(); // consume '/'
+          if (this.cc === gtCc) {
+            this.next(); // consume '>'
+            this.emit(ItemType.rightEmptyTag);
+            return this.scanText;
+          }
+          return this.fail(`expected '/>', found '/'`);
+
+        case gtCc:
+          this.next(); // consume '>'
+          this.emit(ItemType.rightStartTag);
+          return this.scanText;
+      }
+
       while (!this.isEOF) {
         if (this.isNamespacer) {
+
           this.emit(ItemType.attr);
-          return this.scanAttributes;
+          this.ignoreSpaces();
+
+          if (this.cc === equalCc) {
+            this.next(); // consume '='
+            this.ignoreSpaces();
+            return this.scanValue;
+          }
+          return this.fail(`expected '='`);
         }
+
         this.next();
       }
       return null;
     }
 
     scanValue() {
-      const symbol = this.cc; // ' or "
-      this.next(); // consume quotation
+      const qt = this.cc; // ' or "
+      this.next(); // consume qt
+      this.start = this.offset;
       while (!this.isEOF) {
-        if (this.cc === symbol) {
+        if (this.cc === qt) {
           this.emit(ItemType.value);
-          this.next(); // consume quotation
-          return this.scanAttributes;
+          this.next(); // consume qt
+          this.start = this.offset;
+          return this.scanAttribute;
         }
+        this.next();
       }
       return null;
     }
   }
 }
 
-const src = `lorem ipsum`;
+const src = `</hoge >`;
 let s = new rdml.Scanner(src);
 s.run();
 const want = [
