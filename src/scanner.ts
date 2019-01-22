@@ -194,7 +194,7 @@ namespace rdml {
         }
         this.next();
       }
-      return null;
+      return this.fail(`unclosed end tag`);
     }
 
     scanRightEndTag() {
@@ -212,7 +212,7 @@ namespace rdml {
         this.next();
         this.start = this.offset;
       }
-      return null;
+      return this.fail(`unclosed end tag`);
     }
 
     scanStartTag() {
@@ -223,7 +223,7 @@ namespace rdml {
         }
         this.next();
       }
-      return this.fail(`unclosed tag`);
+      return this.fail(`unclosed start tag`);
     }
 
     scanAttribute(): stateFn {
@@ -242,6 +242,10 @@ namespace rdml {
           this.next(); // consume '>'
           this.emit(ItemType.rightStartTag);
           return this.scanText;
+
+        case singleQtCc:
+        case doubleQtCc:
+          return this.fail(`unexpected ${this.src[this.offset]}`);
       }
 
       while (!this.isEOF) {
@@ -260,7 +264,7 @@ namespace rdml {
 
         this.next();
       }
-      return null;
+      return this.fail(`unclosed start tag`);
     }
 
     scanValue() {
@@ -276,12 +280,12 @@ namespace rdml {
         }
         this.next();
       }
-      return null;
+      return this.fail(`unclosed value`);
     }
   }
 }
 
-const src = `</hoge >`;
+const src = `<hoge fuga = "aaaaaa""`;
 let s = new rdml.Scanner(src);
 s.run();
 const want = [
