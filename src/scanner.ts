@@ -1,6 +1,6 @@
 /// <reference path="rdml.ts" />
 
-namespace rdml.scanner {
+namespace rdml {
 
   const sp = " ";
   const spCc = sp.charCodeAt(0);
@@ -30,7 +30,7 @@ namespace rdml.scanner {
   const doubleQtCc = doubleQt.charCodeAt(0);
   const eof = 0;
 
-  enum ItemType {
+  export enum ItemType {
     invalid = 0,
     eof,
     text,
@@ -86,7 +86,7 @@ namespace rdml.scanner {
     run() {
       let state: stateFn = this.scanText;
       while (state !== null) {
-        state = state();
+        state = state.call(this);
       }
     }
 
@@ -114,11 +114,21 @@ namespace rdml.scanner {
     }
 
     get isEOF() {
-      return this.cc <= 0;
+      return this.cc < 0;
+    }
+
+    dump() {
+      let obj: any = [];
+      for (const item of this.items) {
+        obj.push({
+          typ: item.typ,
+          lit: this.src.slice(item.start, item.end),
+        })
+      }
+      return JSON.stringify(obj);
     }
 
     scanText() {
-      console.log(this);
       while (!this.isEOF) {
         if (this.cc === ltCc) {
           return this.scanTag;
@@ -240,8 +250,15 @@ namespace rdml.scanner {
 }
 
 const src = `lorem ipsum`;
-let s = new rdml.scanner.Scanner(src);
-console.log(s);
+let s = new rdml.Scanner(src);
 s.run();
-console.dir(s);
-console.log(JSON.stringify(s.items));
+const want = [
+  {
+    typ: rdml.ItemType.text,
+    lit: `lorem ipsum`,
+  },
+  { typ: rdml.ItemType.eof, lit: `` }
+]
+const fact = s.dump();
+console.log(fact);
+console.log(fact === JSON.stringify(want));
