@@ -13,13 +13,25 @@ namespace rdml {
     }
 
     get data(): string {
+      if (this.childNodes.length === 1) {
+        const c = this.childNodes[0];
+        if (typeof c === "string") { return c; }
+        return "";
+      }
+
       let s = "";
       for (const c of this.childNodes) {
-        if (typeof c === "string") {
-          s += c;
-        }
+        if (typeof c === "string") { s += c; }
       }
       return s;
+    }
+
+    get isEmptyElement() {
+      switch (this.name) {
+        case "br":
+          return true;
+      }
+      return false;
     }
   }
 
@@ -56,10 +68,26 @@ namespace rdml {
 
     parseNodes(elName: string): Node[] {
       let nodes: Node[] = [];
+
+      if (elName === "script") {
+        let before = this.item;
+        const start = before.start;
+        this.next();
+        while (true) {
+          if (this.typ === ItemType.elemName && before.typ === ItemType.leftEndTag) {
+            if (this.lit === "script") {
+              const end = before.start;
+              nodes.push(this.scanner.src.slice(start, end));
+              return nodes;
+            }
+          }
+        }
+      }
+
       while (true) {
         switch (this.typ) {
           case ItemType.text:
-            nodes.push(this.lit);
+            nodes.push(replaceEntitiesInText(this.lit));
 
           case ItemType.leftStartTag:
             nodes.push(this.parseElement());
@@ -82,25 +110,42 @@ namespace rdml {
       this.next();
 
       while (true) {
+        const typ = this.typ;
+        const lit = this.lit;
+        this.next(); // always make progress
+
         switch (this.typ) {
           case ItemType.rightStartTag:
-            this.next();
+            if (el.isEmptyElement) { break; }
             el.childNodes = this.parseNodes(el.name);
             break;
+
           case ItemType.rightEmptyTag:
-            this.next();
             break;
         }
 
         // otherwise, attribute found
-        const attr = this.lit;
-        this.next(); // consume attr
+        const attr = lit;
         this.next(); // consume '='
         const value = this.lit;
         this.next(); // consume value
-        el.attrs[attr] = value;
+        el.attrs[attr] = replaceEntitiesInQt(value);
       }
       return el;
     }
+  }
+
+  function replaceEntitiesInQt(src: string) {
+    src = src.replace(/&quot;/g, `"`);
+    src = src.replace(/&apos;/g, `'`);
+    src = src.replace(/&amp;/g, `&`);
+    return src;
+  }
+
+  function replaceEntitiesInText(src: string) {
+    src = src.replace(/&lt;/g, `<`);
+    src = src.replace(/&gt;/g, `>`);
+    src = src.replace(/&amp;/g, `&`);
+    return src;
   }
 }
