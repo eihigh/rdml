@@ -34,7 +34,7 @@
     const subcmd = args[0];
   }
 
-  // append file handling
+  // load waiting
   const __updateWaitMode = Game_Interpreter.prototype.updateWaitMode;
   Game_Interpreter.prototype.updateWaitMode = function(): boolean {
     if (this._waitMode === "rdml loading") {
@@ -45,5 +45,14 @@
       return true;
     }
     return __updateWaitMode.call(this);
+  }
+
+  // append load waiting command
+  const __initialize = Game_Interpreter.prototype.initialize;
+  Game_Interpreter.prototype.initialize = function(depth) {
+    __initialize.call(this, depth);
+    if (!rdml.hasLoaded()) {
+      this._waitMode = "rdml loading";
+    }
   }
 })();
