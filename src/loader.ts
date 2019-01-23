@@ -2,9 +2,11 @@
 
 namespace rdml {
 
-  export function load(path: string) {
-    if (!(path in files)) {
-      files[path] = new File(path);
+  export function load(paths: string[]) {
+    for (const path of paths) {
+      if (!(path in files)) {
+        files[path] = new File(path);
+      }
     }
   }
 
