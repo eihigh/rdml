@@ -3,6 +3,8 @@
 
 (() => {
 
+  return; // for testing
+
   // helpers
   const pluginName = "RDML";
   let params: any = {};

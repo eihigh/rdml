@@ -1,4 +1,4 @@
-/// <reference path="rdml.ts" />
+/// <reference path="doc.ts" />
 /// <reference path="scanner.ts" />
 
 namespace rdml {
@@ -39,17 +39,24 @@ namespace rdml {
 
   export type Attrs = { [attr: string]: string };
 
+  export function parseString(src: string): Node[] {
+    const scanner = new Scanner(src);
+    scanner.run();
+    const parser = new Parser(scanner);
+    return parser.parse();
+  }
+
   export class Parser {
-    scanner: Scanner = new Scanner("");
     pos: number = 0;
-    items: Item[] = [];
+
+    constructor(private scn: Scanner) { }
 
     next() {
       this.pos++;
     }
 
     get item() {
-      return this.items[this.pos];
+      return this.scn.items[this.pos];
     }
 
     get typ() {
@@ -58,7 +65,11 @@ namespace rdml {
 
     get lit() {
       const i = this.item;
-      return this.scanner.src.slice(i.start, i.end);
+      return this.scn.src.slice(i.start, i.end);
+    }
+
+    get isEOF() {
+      return this.pos >= this.scn.items.length;
     }
 
     parse(): Node[] {
@@ -68,36 +79,42 @@ namespace rdml {
 
     parseNodes(elName: string): Node[] {
       let nodes: Node[] = [];
+      //
+      // if (elName === "script") {
+      //   let before = this.item;
+      //   const start = before.start;
+      //   this.next();
+      //   while (true) {
+      //     if (this.typ === ItemType.elemName && before.typ === ItemType.leftEndTag) {
+      //       if (this.lit === "script") {
+      //         const end = before.start;
+      //         nodes.push(this.scn.src.slice(start, end));
+      //         return nodes;
+      //       }
+      //     }
+      //   }
+      // }
 
-      if (elName === "script") {
-        let before = this.item;
-        const start = before.start;
-        this.next();
-        while (true) {
-          if (this.typ === ItemType.elemName && before.typ === ItemType.leftEndTag) {
-            if (this.lit === "script") {
-              const end = before.start;
-              nodes.push(this.scanner.src.slice(start, end));
-              return nodes;
-            }
-          }
-        }
-      }
-
-      while (true) {
+      while (!this.isEOF) {
         switch (this.typ) {
           case ItemType.text:
             nodes.push(replaceEntitiesInText(this.lit));
+            break;
 
           case ItemType.leftStartTag:
             nodes.push(this.parseElement());
+            break;
 
           case ItemType.leftEndTag:
             if (this.lit !== elName) {
               // error
             }
-            break;
+            this.next(); // consume </
+            this.next(); // consume name
+            this.next(); // consume >
+            return nodes;
         }
+        this.next();
       }
       return nodes;
     }
@@ -109,19 +126,18 @@ namespace rdml {
       el.name = this.lit;
       this.next();
 
-      while (true) {
+      while (!this.isEOF) {
         const typ = this.typ;
         const lit = this.lit;
         this.next(); // always make progress
 
-        switch (this.typ) {
+        switch (typ) {
           case ItemType.rightStartTag:
-            if (el.isEmptyElement) { break; }
             el.childNodes = this.parseNodes(el.name);
-            break;
+            return el;
 
           case ItemType.rightEmptyTag:
-            break;
+            return el;
         }
 
         // otherwise, attribute found
@@ -129,13 +145,13 @@ namespace rdml {
         this.next(); // consume '='
         const value = this.lit;
         this.next(); // consume value
-        el.attrs[attr] = replaceEntitiesInQt(value);
+        el.attrs[attr] = replaceEntitiesInValue(value);
       }
       return el;
     }
   }
 
-  function replaceEntitiesInQt(src: string) {
+  function replaceEntitiesInValue(src: string) {
     src = src.replace(/&quot;/g, `"`);
     src = src.replace(/&apos;/g, `'`);
     src = src.replace(/&amp;/g, `&`);
@@ -149,3 +165,9 @@ namespace rdml {
     return src;
   }
 }
+
+const str = `<p>text<m></m></p>`;
+const nodes = rdml.parseString(str);
+console.time("parse");
+console.log(JSON.stringify(nodes));
+console.timeEnd("parse");

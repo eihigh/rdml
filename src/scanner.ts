@@ -1,4 +1,4 @@
-/// <reference path="rdml.ts" />
+/// <reference path="doc.ts" />
 
 namespace rdml {
 
@@ -28,7 +28,6 @@ namespace rdml {
   const singleQtCc = singleQt.charCodeAt(0);
   const doubleQt = '"';
   const doubleQtCc = doubleQt.charCodeAt(0);
-  const eof = 0;
 
   export enum ItemType {
     invalid = 0,
@@ -47,7 +46,7 @@ namespace rdml {
     rightEndTag,
   }
 
-  class Item {
+  export class Item {
     constructor(
       public typ: ItemType,
       public start: number,
@@ -58,34 +57,40 @@ namespace rdml {
   type stateFn = ((this: Scanner) => stateFn) | null;
 
   class ScanError implements Error {
-    name = "Scan Error";
+    name = "Syntax Error";
     message: string;
-    constructor(msg: string, pos: number) {
-      this.message = `${this.name}: ${msg} at ${pos}`
+    constructor(msg: string, line: number) {
+      this.message = `${this.name}: ${msg} at line ${line}`
     }
   }
 
   export class Scanner {
-    src: string = "";   // source
-    cc: number = 0;     // current charCode; surrogate pair ignored
-    start: number = 0;  // token start offset
-    offset: number = 0; // charcter offset
-    width: number = 0;  // charcter width
+    src: string = "";    // source
+    cc: number = 0;      // current charCode; surrogate pair ignored
+    start: number = 0;   // token start offset
+    offset: number = -1; // charcter offset
+    line: number = 1;    // line number
+    width: number = 1;   // charcter width
     items: Item[] = [];
     err: ScanError | null = null;
 
     constructor(src: string) {
       this.src = src;
-      if (src.length > 0) { this.cc = src.charCodeAt(0); }
+      this.next();
     }
 
     next() {
-      this.offset += 1;
+      this.offset += this.width;
       if (this.src.length <= this.offset) {
         this.cc = -1;
         return;
       }
-      this.cc = this.src.charCodeAt(this.offset);
+      const c = this.src.charCodeAt(this.offset);
+      this.width = (0xD800 <= c && c <= 0xDBFF) || (0xDC00 <= c && c <= 0xDFFF) ? 2 : 1;
+      this.cc = c;
+      if (this.cc === lfCc) {
+        this.line++;
+      }
     }
 
     emit(typ: ItemType) {
@@ -99,13 +104,13 @@ namespace rdml {
         state = state.call(this);
       }
       if (this.err !== null) {
-        console.log(this.err.message);
+        throw this.err;
       }
     }
 
     fail(msg: string) {
       this.emit(ItemType.invalid);
-      this.err = new ScanError(msg, this.offset);
+      this.err = new ScanError(msg, this.line);
       return null;
     }
 
@@ -256,6 +261,7 @@ namespace rdml {
 
           if (this.cc === equalCc) {
             this.next(); // consume '='
+            this.emit(ItemType.equal);
             this.ignoreSpaces();
             return this.scanValue;
           }
@@ -285,16 +291,15 @@ namespace rdml {
   }
 }
 
-const src = `<hoge fuga = "aaaaaa""`;
-let s = new rdml.Scanner(src);
-s.run();
-const want = [
-  {
-    typ: rdml.ItemType.text,
-    lit: `lorem ipsum`,
-  },
-  { typ: rdml.ItemType.eof, lit: `` }
-]
-const fact = s.dump();
-console.log(fact);
-console.log(fact === JSON.stringify(want));
+// const src = `<p a    = '  aaaa'   />`
+// console.log(src);
+// let s = new rdml.Scanner(src);
+// console.time('scanning');
+// try {
+//   s.run();
+// } catch (e) {
+//   console.log(e.message);
+// }
+// console.timeEnd('scanning');
+// const fact = s.dump();
+// console.log(fact);
