@@ -40,7 +40,6 @@ namespace rdml {
 
     onload() {
       const nodes: Node[] = [];
-      let pname = ""; // package name
 
       for (const node of nodes) {
         if (typeof node === "string") { continue; }
@@ -51,9 +50,9 @@ namespace rdml {
           for (const child of elem.children) {
             this.make(pname, child);
           }
+        } else {
+          this.make("", elem);
         }
-
-        this.make("", elem);
       }
     }
 
