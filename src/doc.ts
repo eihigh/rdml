@@ -7,6 +7,8 @@
 
 /*:ja
  * @plugindesc HTML/XML風汎用構文でRPGツクールのデータを記述するためのプラグイン
- * @author ei1chi
+ * @author eihigh
  *
+ * @param paths
+ * @type ...[]
  */
