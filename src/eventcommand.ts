@@ -49,6 +49,13 @@ namespace rdml {
         "": new conv.Int(1, 10),
       }),
     },
+    actorID: {
+      desc: "アクターID",
+      converter: new conv.Match({
+        "all": new conv.Fixed(0),
+        "": new conv.Int(1, 10),
+      }),
+    },
     time: {
       desc: "フレーム数",
       converter: new conv.Int(0, 100),
@@ -78,7 +85,7 @@ namespace rdml {
       0: { ref: "type" },
       1: { ref: "time" },
       2: { ref: "scale", index: 0 },
-    }
+    } as { [id: number]: any },
   }
 
   // converting mock
@@ -89,6 +96,15 @@ namespace rdml {
     const value = el.attrs["type"]; // oops.
     const out = ps["type"].unit.converter.convert(value);
     // ここで一旦キー=>パラメータのオブジェクトに詰める
+    const results = {
+      "type": out,
+    };
     // その後tkoolParamsに詰め替える
+    const tps = cmd.tkoolParams;
+    let params: Param[] = [];
+    for (const index in tps) {
+      const tp = tps[index];
+      params[index] = results["type"];
+    }
   }
 }
