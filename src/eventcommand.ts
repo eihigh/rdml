@@ -3,27 +3,6 @@
 
 namespace rdml {
 
-  interface baseType {
-    convert: (s: string | null) => Param; // validate and convert here
-  }
-
-  namespace baseTypes {
-    export class Int {
-      constructor(
-        public min: number | null,
-        public max: number | null,
-        public def: number | null,
-      ) { }
-
-      convert(s: string | null): Param {
-        if (s !== null) {
-          return parseInt(s);
-        }
-        return 0;
-      }
-    }
-  }
-
   interface Converter {
     convert: (src: string) => Param;
   }
@@ -76,6 +55,8 @@ namespace rdml {
     },
   }
 
+  const REQUIRED = null;
+
   const hogeCmd = {
     __alts: ["fuga"],
     __dataAttr: "type",
@@ -83,11 +64,13 @@ namespace rdml {
     rdmlParams: {
       "type": {
         unit: units.id,
-        desc: "hoge実行タイプ",
+        desc: "天候タイプ",
+        default: REQUIRED,
       },
       time: {
         unit: units.time,
-        desc: "hoge実行フレーム数",
+        desc: "フェードイン時間",
+        default: 60,
       },
     },
 
@@ -103,8 +86,8 @@ namespace rdml {
     const el = new Element();
     const cmd = hogeCmd;
     const ps = cmd.rdmlParams;
-    const attr = el.attrs["type"]; // oops.
-    const out = ps["type"].unit.baseType.convert(attr);
+    const value = el.attrs["type"]; // oops.
+    const out = ps["type"].unit.converter.convert(value);
     // ここで一旦キー=>パラメータのオブジェクトに詰める
     // その後tkoolParamsに詰め替える
   }
