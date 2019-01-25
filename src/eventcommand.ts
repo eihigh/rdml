@@ -24,23 +24,55 @@ namespace rdml {
     }
   }
 
+  interface Converter {
+    convert: (src: string) => Param;
+  }
+
+  namespace conv {
+    export class Fixed {
+      constructor(private param: Param) { }
+      convert(src: string) { return this.param; }
+    }
+
+    export class Int {
+      constructor(
+        private min: number,
+        private max: number,
+      ) { }
+      convert(src: string) { return parseInt(src); }
+    }
+
+    export class Match {
+      constructor(private cases: { [name: string]: Converter }) { }
+      convert(src: string) {
+        if (src in this.cases) {
+          return this.cases[src].convert("");
+        }
+        return this.cases[""].convert(src);
+      }
+    }
+  }
+
   interface unit {
     desc: string;
-    baseType: baseType;
+    converter: Converter;
   }
 
   const units: { [name: string]: unit } = {
     id: {
       desc: "ID",
-      baseType: new baseTypes.Int(0, null, 0),
+      converter: new conv.Int(0, 10),
     },
     idBased1: {
       desc: "1以上のID",
-      baseType: new baseTypes.Int(1, null, 1),
+      converter: new conv.Match({
+        "all": new conv.Fixed(-2),
+        "": new conv.Int(1, 10),
+      }),
     },
     time: {
       desc: "フレーム数",
-      baseType: new baseTypes.Int(0, null, 60),
+      converter: new conv.Int(0, 100),
     },
   }
 
