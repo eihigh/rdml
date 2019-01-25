@@ -1,5 +1,6 @@
 /// <reference path="rdml.ts" />
 /// <reference path="parser.ts" />
+/// <reference path="check.ts" />
 
 namespace rdml {
 
@@ -15,10 +16,10 @@ namespace rdml {
 
     export class Int {
       constructor(
-        private min: number,
-        private max: number,
+        private min: number | null,
+        private max: number | null,
       ) { }
-      convert(src: string) { return parseInt(src); }
+      convert(src: string) { return check.int(src, this.min, this.max); }
     }
 
     export class Match {
@@ -40,33 +41,33 @@ namespace rdml {
   const units: { [name: string]: unit } = {
     id: {
       desc: "ID",
-      converter: new conv.Int(0, 10),
+      converter: new conv.Int(0, null),
     },
     idBased1: {
       desc: "1以上のID",
       converter: new conv.Match({
         "all": new conv.Fixed(-2),
-        "": new conv.Int(1, 10),
+        "": new conv.Int(1, null),
       }),
     },
     actorID: {
       desc: "アクターID",
       converter: new conv.Match({
         "all": new conv.Fixed(0),
-        "": new conv.Int(1, 10),
+        "": new conv.Int(1, null),
       }),
     },
     time: {
       desc: "フレーム数",
-      converter: new conv.Int(0, 100),
+      converter: new conv.Int(0, null),
     },
   }
 
   const REQUIRED = null;
 
   const hogeCmd = {
-    __alts: ["fuga"],
-    __dataAttr: "type",
+    alts: ["fuga"],
+    dataAttr: "type",
 
     rdmlParams: {
       "type": {
