@@ -15,7 +15,7 @@ namespace rdml {
 
   export let procs: { [id: string]: Proc } = {};
 
-  type Param = string | number | boolean | number[];
+  export type Param = string | number | boolean | number[];
 
   interface EventCmd {
     code: number;
