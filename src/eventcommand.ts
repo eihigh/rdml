@@ -34,16 +34,19 @@ namespace rdml {
   }
 
   interface unit {
+    attr: string;
     desc: string;
     converter: Converter;
   }
 
   const units: { [name: string]: unit } = {
     id: {
+      attr: "id",
       desc: "ID",
       converter: new conv.Int(0, null),
     },
     idBased1: {
+      attr: "id",
       desc: "1以上のID",
       converter: new conv.Match({
         "all": new conv.Fixed(-2),
@@ -51,6 +54,7 @@ namespace rdml {
       }),
     },
     actorID: {
+      attr: "id",
       desc: "アクターID",
       converter: new conv.Match({
         "all": new conv.Fixed(0),
@@ -58,6 +62,7 @@ namespace rdml {
       }),
     },
     time: {
+      attr: "time",
       desc: "フレーム数",
       converter: new conv.Int(0, null),
     },
@@ -100,54 +105,27 @@ namespace rdml {
     },
   };
 
-  const hogeCmd = {
-    alts: ["fuga"],
-    dataAttr: "type",
-    params: [
-      {
-        unit: units.actorID,
-        desc: "天候タイプ",
-        default: REQUIRED,
-      },
-    ],
+  function elem2cmd(el: Element) {
+    if (!(el.name in commands)) {
+      throw new Error(`unknown command ${el.name}`);
+    }
+    const cmd = commands[el.name]; // TODO aliases
+    const rps = cmd.rdmlParams;
 
-    rdmlParams: {
-      "type": {
-        unit: units.id,
-        desc: "天候タイプ",
-        default: REQUIRED,
-      },
-      time: {
-        unit: units.time,
-        desc: "フェードイン時間",
-        default: 60,
-      },
-    },
+    let results: { [attr: string]: Param } = {};
+    for (const rp of rps) {
+      const unit = rp.unit;
+      const attr = unit.attr; // TODO aliases
+      const value = el.attrs[attr];
+      const conved = unit.converter.convert(value);
+      results[attr] = conved;
+    }
 
-    tkoolParams: {
-      0: { ref: "type" },
-      1: { ref: "time" },
-      2: { ref: "scale", index: 0 },
-    } as { [id: number]: any },
-  }
-
-  // converting mock
-  function hoge() {
-    const el = new Element();
-    const cmd = hogeCmd;
-    const ps = cmd.rdmlParams;
-    const value = el.attrs["type"]; // oops.
-    const out = ps["type"].unit.converter.convert(value);
-    // ここで一旦キー=>パラメータのオブジェクトに詰める
-    const results = {
-      "type": out,
-    };
-    // その後tkoolParamsに詰め替える
-    const tps = cmd.tkoolParams;
     let params: Param[] = [];
-    for (const index in tps) {
-      const tp = tps[index];
-      params[index] = results["type"];
+    for (let i = 0; i < cmd.tkoolParams.length; i++) {
+      const tp = cmd.tkoolParams[i];
+      const param = results[tp.ref];
+      params.push(param);
     }
   }
 }
