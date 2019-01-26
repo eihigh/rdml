@@ -63,11 +63,53 @@ namespace rdml {
     },
   }
 
+  interface rdmlParam {
+    unit: unit;
+    desc: string;
+    default: Param | null;
+  }
+
+  interface tkoolParam {
+    ref: string;
+    index?: number;
+  }
+
+  interface command {
+    aliases: string[];
+    dataAttr: string;
+    rdmlParams: rdmlParam[];
+    tkoolParams: tkoolParam[];
+  }
+
   const REQUIRED = null;
+
+  const commands: { [name: string]: command } = {
+    wait: {
+      aliases: [],
+      dataAttr: "time",
+      rdmlParams: [
+        {
+          unit: units.time,
+          desc: "ウェイト時間",
+          default: 60,
+        },
+      ],
+      tkoolParams: [
+        { ref: "time" },
+      ],
+    },
+  };
 
   const hogeCmd = {
     alts: ["fuga"],
     dataAttr: "type",
+    params: [
+      {
+        unit: units.actorID,
+        desc: "天候タイプ",
+        default: REQUIRED,
+      },
+    ],
 
     rdmlParams: {
       "type": {
