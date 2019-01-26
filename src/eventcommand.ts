@@ -1,5 +1,5 @@
 /// <reference path="rdml.ts" />
-/// <reference path="parser.ts" />
+/// <reference path="types.ts" />
 /// <reference path="check.ts" />
 
 namespace rdml {
@@ -8,7 +8,7 @@ namespace rdml {
     convert: (src: string) => Param;
   }
 
-  namespace conv {
+  export namespace conv {
     export class Fixed {
       constructor(private param: Param) { }
       convert(src: string) { return this.param; }
@@ -33,13 +33,13 @@ namespace rdml {
     }
   }
 
-  interface unit {
+  export interface Unit {
     attr: string;
     desc: string;
     converter: Converter;
   }
 
-  const units: { [name: string]: unit } = {
+  const units: { [name: string]: Unit } = {
     id: {
       attr: "id",
       desc: "ID",
@@ -69,17 +69,18 @@ namespace rdml {
   }
 
   interface rdmlParam {
-    unit: unit;
+    unit: Unit;
     desc: string;
     default: Param | null;
   }
 
   interface tkoolParam {
-    ref: string;
+    attr: string;
     index?: number;
   }
 
-  interface command {
+  interface cmdDefinition {
+    code: number;
     aliases: string[];
     dataAttr: string;
     rdmlParams: rdmlParam[];
@@ -88,8 +89,9 @@ namespace rdml {
 
   const REQUIRED = null;
 
-  const commands: { [name: string]: command } = {
+  const cmdDefinitions: { [name: string]: cmdDefinition } = {
     wait: {
+      code: 230,
       aliases: [],
       dataAttr: "time",
       rdmlParams: [
@@ -100,32 +102,40 @@ namespace rdml {
         },
       ],
       tkoolParams: [
-        { ref: "time" },
+        { attr: "time" },
       ],
     },
   };
 
-  function elem2cmd(el: Element) {
-    if (!(el.name in commands)) {
-      throw new Error(`unknown command ${el.name}`);
+  export function elem2cmd(el: Element): EventCmd {
+    if (!(el.name in cmdDefinitions)) {
+      throw new Error(`unknown command "${el.name}"`);
     }
-    const cmd = commands[el.name]; // TODO aliases
-    const rps = cmd.rdmlParams;
+    const cmd = cmdDefinitions[el.name]; // TODO aliases
 
     let results: { [attr: string]: Param } = {};
-    for (const rp of rps) {
+    for (const rp of cmd.rdmlParams) {
       const unit = rp.unit;
       const attr = unit.attr; // TODO aliases
       const value = el.attrs[attr];
-      const conved = unit.converter.convert(value);
+      if (rp.default === REQUIRED && value === "") {
+        throw new Error(`required "${attr}" for "${el.name}" command`);
+      }
+      const conved = (value === "" && rp.default !== null)
+        ? rp.default : unit.converter.convert(value);
       results[attr] = conved;
     }
 
     let params: Param[] = [];
-    for (let i = 0; i < cmd.tkoolParams.length; i++) {
-      const tp = cmd.tkoolParams[i];
-      const param = results[tp.ref];
+    for (const tp of cmd.tkoolParams) {
+      const param = results[tp.attr];
       params.push(param);
     }
+
+    return {
+      code: cmd.code,
+      indent: 0,
+      parameters: params,
+    };
   }
 }
