@@ -1,4 +1,5 @@
 /// <reference path="event.ts" />
+/// <reference path="parser.ts" />
 
 namespace rdml {
 
@@ -38,7 +39,7 @@ namespace rdml {
     }
 
     onload() {
-      const nodes: Node[] = [];
+      const nodes: Node[] = parseString(this.xhr.responseText);
 
       for (const node of nodes) {
         if (typeof node === "string") { continue; }
