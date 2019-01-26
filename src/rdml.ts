@@ -1,9 +1,10 @@
 /// <reference path="doc.ts" />
 /// <reference path="loader.ts" />
+/// <reference path="event.ts" />
 
 (() => {
 
-  return; // for testing
+  // return; // for testing
 
   // helpers
   const pluginName = "RDML";
@@ -29,11 +30,16 @@
   // define plugin command
   const __pluginCommand = Game_Interpreter.prototype.pluginCommand;
   Game_Interpreter.prototype.pluginCommand = function(cmd: string, args: string[]) {
-    __pluginCommand.call(this, cmd, args);
 
+    __pluginCommand.call(this, cmd, args);
     if (cmd !== "rdml") { return; }
 
     const subcmd = args[0];
+    switch (subcmd) {
+      case "proc":
+        rdml.execProc(this, args[1]);
+        break;
+    }
   }
 
   // load waiting
@@ -49,7 +55,7 @@
     return __updateWaitMode.call(this);
   }
 
-  // append load waiting command
+  // set load waiting mode (CONFLICTABLE)
   const __initialize = Game_Interpreter.prototype.initialize;
   Game_Interpreter.prototype.initialize = function(depth) {
     __initialize.call(this, depth);

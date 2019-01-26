@@ -1,4 +1,3 @@
-/// <reference path="rdml.ts" />
 /// <reference path="types.ts" />
 /// <reference path="check.ts" />
 

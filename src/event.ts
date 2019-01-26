@@ -8,9 +8,14 @@ namespace rdml {
    * called as common event
    */
 
-  export function call(i: Game_Interpreter, id: string) {
+  export function execProc(i: Game_Interpreter, id: string) {
     const cmds: EventCmd[] = procs[id].cmds;
     i.setupChild(cmds, 0);
+  }
+
+  export function makeProc(el: Element) {
+    const name = el.attrs["name"];
+    procs[name] = new Proc(el);
   }
 
   export let procs: { [id: string]: Proc } = {};
@@ -20,7 +25,7 @@ namespace rdml {
     lastCmd: EventCmd | null = null;
     children: { [id: string]: Proc } = {};
 
-    constructor(root: Element, depth: number) {
+    constructor(root: Element) {
       this.parseBlock(root, 0);
     }
 

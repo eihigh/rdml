@@ -1,4 +1,4 @@
-/// <reference path="rdml.ts" />
+/// <reference path="event.ts" />
 
 namespace rdml {
 
@@ -33,7 +33,6 @@ namespace rdml {
           this.onload();
           this.loaded = true;
         }
-        // TODO: error handling
       };
       this.xhr.send();
     }
@@ -44,21 +43,23 @@ namespace rdml {
       for (const node of nodes) {
         if (typeof node === "string") { continue; }
 
-        const elem: Element = node;
-        if (elem.name === "package") {
-          const pname = elem.attrs["name"];
-          for (const child of elem.children) {
+        const el: Element = node;
+        if (el.name === "package") {
+          const pname = el.attrs["name"];
+          for (const child of el.children) {
             this.make(pname, child);
           }
         } else {
-          this.make("", elem);
+          this.make("", el);
         }
       }
     }
 
-    make(pname: string, elem: Element) {
-      switch (elem.name) {
+    make(pname: string, el: Element) {
+      switch (el.name) {
         case "proc":
+          makeProc(el);
+          break;
       }
     }
   }

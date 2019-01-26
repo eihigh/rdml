@@ -1,5 +1,4 @@
 /// <reference path="types.ts" />
-/// <reference path="doc.ts" />
 /// <reference path="scanner.ts" />
 
 namespace rdml {
