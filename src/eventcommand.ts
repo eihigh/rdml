@@ -138,3 +138,17 @@ namespace rdml {
     };
   }
 }
+
+namespace rdml.eventcommands {
+  interface subParams {
+    attr: string;
+    chosen: string;
+    params: Param[];
+  }
+
+  type rdmlParam = Param[] | subParams;
+
+  type rdmlParams = { [key: string]: rdmlParam };
+
+  type converter = (p: rdmlParams) => Param[];
+}
