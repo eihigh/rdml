@@ -146,9 +146,20 @@ namespace rdml.eventcommands {
     params: Param[];
   }
 
-  type rdmlParam = Param[] | subParams;
-
-  type rdmlParams = { [key: string]: rdmlParam };
+  type rdmlParams = { [key: string]: subParams };
 
   type converter = (p: rdmlParams) => Param[];
+
+  function heal(rps: rdmlParams): Param[] {
+    let p: Param[] = [];
+    p[0] = rps["actor"].params[0];
+    p[1] = ({
+      "hpof": 0,
+      "mpof": 1,
+      "tpof": 2,
+    } as { [key: string]: number })[rps["actor"].chosen];
+    p[2] = rps["value"].params[0];
+    p[3] = rps["value"].chosen === "num" ? 0 : 1; // num or var
+    return p;
+  }
 }
