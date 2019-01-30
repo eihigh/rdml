@@ -173,14 +173,38 @@ namespace rdml.eventcommands {
     }
   }
 
-  interface ParamType {
-    validate: (src: string) => Param[];
+  type filter = (src: string) => Param[];
+
+  export namespace fns {
+    export function fixed(val: Param): filter {
+      return (src: string) => [val];
+    }
+
+    export function match(cases: { [name: string]: filter }): filter {
+      return (src: string) => {
+        if (!(src in cases)) { throw new Error(`no matches`); }
+        return cases[src](src);
+      }
+    }
+
+    export function int(min: number | null, max: number | null): filter {
+      return (src: string) => [check.int(src, min, max)];
+    }
   }
 
-  class FixType {
-    constructor(private val: Param) { }
-    validate(src: string): Param[] { return [this.val]; }
+  interface ParamType {
+    desc: string;
+    attr: string;
+    filter: filter;
   }
+
+  const types: { [name: string]: ParamType } = {
+    time: {
+      desc: "id",
+      attr: "id",
+      filter: fns.int(0, null),
+    }
+  };
 
   interface SubAttrDesc {
     key: string;
@@ -208,7 +232,7 @@ namespace rdml.eventcommands {
       attrs: [
         {
           key: "time",
-          typ: new FixType(0),
+          typ: types.time,
           default: REQUIRED,
         },
         // {
@@ -249,7 +273,7 @@ namespace rdml.eventcommands {
 
       if (attr.subs === undefined) {
         const key = attr.key;
-        const values = attr.typ.validate(el.attrs[key]);
+        const values = attr.typ.filter(el.attrs[key]);
         args[key] = {
           sub: "",
           values: values,
@@ -269,7 +293,9 @@ namespace rdml.eventcommands {
     return args;
   }
 
-  function makeSubValue(sub: SubAttrDesc): Param {
-    return 0;
+  function makeSubValue(el: Element, sub: SubAttrDesc): Param[] {
+    if (!(sub.key in el.attrs)) { return []; }
+    const key = sub.key;
+    return sub.typ.filter(el.attrs[key]);
   }
 }
