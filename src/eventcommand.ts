@@ -18,9 +18,9 @@ namespace rdml {
     procs[name] = new Proc(el);
   }
 
-  export let procs: { [id: string]: Proc } = {};
+  let procs: { [id: string]: Proc } = {};
 
-  export class Proc {
+  class Proc {
     cmds: EventCmd[] = [];
     lastCmd: EventCmd | null = null;
     children: { [id: string]: Proc } = {};
@@ -110,6 +110,50 @@ namespace rdml {
     },
   };
 
+  interface Arg {
+    sub: string; // actually described attr if sub attr
+    values: Param[]; // can be array e.g. colors
+  }
+
+  type Args = { [attr: string]: Arg };
+
+  function makeArgs(el: Element) {
+    if (!(el.name in commandDescs)) {
+      throw new Error(`unknown command "${el.name}"`);
+    }
+    let args: Args = {};
+    const cmd = commandDescs[el.name]; // パラメータ変換の素
+
+    for (const attr of cmd.attrs) {
+
+      if (attr.subs === undefined) {
+        const key = attr.key;
+        const values = attr.typ.filter(el.attrs[key]);
+        args[key] = {
+          sub: "",
+          values: values,
+        };
+
+      } else {
+
+        for (const sub of attr.subs) {
+          // const attr = sub.key;
+          // if (attr in el.attrs) {
+          //   const value = makeSubValue(sub);
+          // }
+        }
+      }
+    }
+
+    return args;
+  }
+
+  function makeSubValue(el: Element, sub: SubAttrDesc): Param[] {
+    if (!(sub.key in el.attrs)) { return []; }
+    const key = sub.key;
+    return sub.typ.filter(el.attrs[key]);
+  }
+
   interface SubAttrDesc {
     key: string;
     typ: ParamType;
@@ -158,48 +202,4 @@ namespace rdml {
       // ]),
     },
   };
-
-  interface Arg {
-    sub: string; // actually described attr if sub attr
-    values: Param[]; // can be array e.g. colors
-  }
-
-  type Args = { [attr: string]: Arg };
-
-  function makeArgs(el: Element) {
-    if (!(el.name in commandDescs)) {
-      throw new Error(`unknown command "${el.name}"`);
-    }
-    let args: Args = {};
-    const cmd = commandDescs[el.name]; // パラメータ変換の素
-
-    for (const attr of cmd.attrs) {
-
-      if (attr.subs === undefined) {
-        const key = attr.key;
-        const values = attr.typ.filter(el.attrs[key]);
-        args[key] = {
-          sub: "",
-          values: values,
-        };
-
-      } else {
-
-        for (const sub of attr.subs) {
-          // const attr = sub.key;
-          // if (attr in el.attrs) {
-          //   const value = makeSubValue(sub);
-          // }
-        }
-      }
-    }
-
-    return args;
-  }
-
-  function makeSubValue(el: Element, sub: SubAttrDesc): Param[] {
-    if (!(sub.key in el.attrs)) { return []; }
-    const key = sub.key;
-    return sub.typ.filter(el.attrs[key]);
-  }
 }
