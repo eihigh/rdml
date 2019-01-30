@@ -178,6 +178,15 @@ namespace rdml.eventcommands {
     }
   }
 
+  const blockCommand = (start: number, end: number, descs: tkoolParamDesc[]): converter => {
+    return (c: Cmds, d: number, e: Element, a: Args) => {
+      // push start command
+      singleCommand(start, descs)(c, d, e, a);
+      // push end command
+      singleCommand(end, [])(c, d, e, a);
+    }
+  }
+
   type filter = (src: string) => Param[];
 
   export namespace fns {
