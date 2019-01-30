@@ -172,7 +172,9 @@ namespace rdml.eventcommands {
 
   interface paramDesc {
     attr: string;
+    union: string[];
     unit: Unit;
+    default: Param | null;
   }
 
   interface commandDesc {
@@ -181,14 +183,24 @@ namespace rdml.eventcommands {
     convert: converter;
   }
 
+  const REQUIRED = null;
+
   const commandDescs: { [name: string]: commandDesc } = {
     wait: {
       desc: "指定時間待機します。",
       params: [
         {
           attr: "time",
+          union: [],
           unit: rdml.units.id,
-        }
+          default: REQUIRED,
+        },
+        // {
+        //  attr: "actor",
+        //  union: ["hp", "mp", "tp"],
+        //  unit: units.actorID,
+        //  default: REQUIRED,
+        // },
       ],
       convert: singleCommand(103, [
         { ref: "time" },
@@ -197,7 +209,9 @@ namespace rdml.eventcommands {
   };
 
   interface rdmlParam {
+    sub: string; // actually selected attr if union attr
     value: Param;
+    values: Param[]; // can be array e.g. colors
   }
 
   type rdmlParams = { [attr: string]: rdmlParam };
