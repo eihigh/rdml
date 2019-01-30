@@ -1,35 +1,57 @@
 /// <reference path="types.ts" />
 /// <reference path="check.ts" />
 
-namespace rdml.eventcommands {
+namespace rdml {
 
-  interface tkoolCommand {
-    code: number;
-    indent: number;
-    parameters: Param[];
+  /*
+   * proc: event procedure
+   * called as common event
+   */
+
+  export function execProc(i: Game_Interpreter, id: string) {
+    const cmds: EventCmd[] = procs[id].cmds;
+    i.setupChild(cmds, 0);
   }
 
-  type Cmds = tkoolCommand[];
+  export function makeProc(el: Element) {
+    const name = el.attrs["name"];
+    procs[name] = new Proc(el);
+  }
 
-  type converter = (c: Cmds, depth: number, e: Element, v: Args) => void;
+  export let procs: { [id: string]: Proc } = {};
+
+  export class Proc {
+    cmds: EventCmd[] = [];
+    lastCmd: EventCmd | null = null;
+    children: { [id: string]: Proc } = {};
+
+    constructor(root: Element) {
+      for (const c of root.children) {
+        pushCommand(this.cmds, c, 0);
+      }
+    }
+  }
+
+  type Cmds = EventCmd[];
+
+  type converter = (c: Cmds, depth: number, e: Element, a: Args) => void;
 
   interface tkoolParamDesc {
-    ref: string;
+    key: string;
     index?: number;
   }
 
-  const parse = (el: Element, cmds: Cmds, depth: number) => {
+  const pushCommand = (cmds: Cmds, el: Element, depth: number) => {
     const desc = commandDescs[el.name];
     const args = makeArgs(el);
     desc.convert(cmds, depth, el, args);
   }
 
   const singleCommand = (code: number, descs: tkoolParamDesc[]): converter => {
-
     return (c: Cmds, d: number, e: Element, a: Args) => {
       const p: Param[] = descs.map<Param>((desc) => {
         const i = desc.index === undefined ? 0 : desc.index;
-        return a[desc.ref].values[i];
+        return a[desc.key].values[i];
       });
 
       c.push({
@@ -44,6 +66,10 @@ namespace rdml.eventcommands {
     return (c: Cmds, d: number, e: Element, a: Args) => {
       // push start command
       singleCommand(start, descs)(c, d, e, a);
+      // push children
+      for (const child of e.children) {
+        pushCommand(c, child, d + 1);
+      }
       // push end command
       singleCommand(end, [])(c, d, e, a);
     }
@@ -51,7 +77,7 @@ namespace rdml.eventcommands {
 
   type filter = (src: string) => Param[];
 
-  export namespace fns {
+  export namespace fs {
     export function fixed(val: Param): filter {
       return (src: string) => [val];
     }
@@ -70,16 +96,18 @@ namespace rdml.eventcommands {
 
   interface ParamType {
     desc: string;
-    attr: string;
     filter: filter;
   }
 
   const types: { [name: string]: ParamType } = {
+    word: {
+      desc: "単語",
+      filter: (src: string) => [src.trim()],
+    },
     time: {
-      desc: "id",
-      attr: "id",
-      filter: fns.int(0, null),
-    }
+      desc: "フレーム数",
+      filter: fs.int(0, null),
+    },
   };
 
   interface SubAttrDesc {
@@ -123,7 +151,7 @@ namespace rdml.eventcommands {
         // },
       ],
       convert: singleCommand(103, [
-        { ref: "time" },
+        { key: "time" },
       ]),
       // convert: singleCommand(103, [
       //   { ref: "actor" },
