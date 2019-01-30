@@ -156,10 +156,15 @@ namespace rdml.eventcommands {
     index?: number;
   }
 
+  const parse = (el: Element, cmds: Cmds, depth: number) => {
+    const desc = commandDescs[el.name];
+    const args = makeArgs(el);
+    desc.convert(cmds, depth, el, args);
+  }
+
   const singleCommand = (code: number, descs: tkoolParamDesc[]): converter => {
 
     return (c: Cmds, d: number, e: Element, a: Args) => {
-
       const p: Param[] = descs.map<Param>((desc) => {
         const i = desc.index === undefined ? 0 : desc.index;
         return a[desc.ref].values[i];
