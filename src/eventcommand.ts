@@ -38,7 +38,7 @@ namespace rdml {
     converter: Converter;
   }
 
-  const units: { [name: string]: Unit } = {
+  export const units: { [name: string]: Unit } = {
     id: {
       attr: "id",
       desc: "ID",
@@ -140,26 +140,72 @@ namespace rdml {
 }
 
 namespace rdml.eventcommands {
-  interface subParams {
-    attr: string;
-    chosen: string;
-    params: Param[];
+
+  interface tkoolCommand {
+    code: number;
+    indent: number;
+    parameters: Param[];
   }
 
-  type rdmlParams = { [key: string]: subParams };
+  type converter = (c: tkoolCommand[], depth: number, e: Element, p: rdmlParams) => void;
 
-  type converter = (p: rdmlParams) => Param[];
+  // only for single command
+  interface tkoolDesc {
+    ref: string;
+  }
 
-  function heal(rps: rdmlParams): Param[] {
-    let p: Param[] = [];
-    p[0] = rps["actor"].params[0];
-    p[1] = ({
-      "hpof": 0,
-      "mpof": 1,
-      "tpof": 2,
-    } as { [key: string]: number })[rps["actor"].chosen];
-    p[2] = rps["value"].params[0];
-    p[3] = rps["value"].chosen === "num" ? 0 : 1; // num or var
-    return p;
+  const singleCommand = (code: number, descs: tkoolDesc[]): converter => {
+    return (c: tkoolCommand[], d: number, e: Element, rps: rdmlParams) => {
+      let p: Param[] = [];
+      for (const desc of descs) {
+        p.push(rps[desc.ref].value);
+      }
+      c.push({
+        code: code,
+        indent: d,
+        parameters: p,
+      });
+    }
+  }
+
+  interface Unit { }
+
+  interface paramDesc {
+    attr: string;
+    unit: Unit;
+  }
+
+  interface commandDesc {
+    desc: string;
+    params: paramDesc[];
+    convert: converter;
+  }
+
+  const commandDescs: { [name: string]: commandDesc } = {
+    wait: {
+      desc: "指定時間待機します。",
+      params: [
+        {
+          attr: "time",
+          unit: rdml.units.id,
+        }
+      ],
+      convert: singleCommand(103, [
+        { ref: "time" },
+      ]),
+    }
+  };
+
+  interface rdmlParam {
+    value: Param;
+  }
+
+  type rdmlParams = { [attr: string]: rdmlParam };
+
+  function elem2params(el: Element) {
+    if (!(el.name in commandDescs)) {
+      throw new Error(`unknown command "${el.name}"`);
+    }
+    const desc = commandDescs[el.name]; // パラメータ変換の素
   }
 }
