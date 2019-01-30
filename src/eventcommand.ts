@@ -147,18 +147,18 @@ namespace rdml.eventcommands {
     parameters: Param[];
   }
 
-  type converter = (c: tkoolCommand[], depth: number, e: Element, p: rdmlParams) => void;
+  type converter = (c: tkoolCommand[], depth: number, e: Element, v: rdmlValues) => void;
 
   // only for single command
-  interface tkoolDesc {
+  interface tkoolParamDesc {
     ref: string;
   }
 
-  const singleCommand = (code: number, descs: tkoolDesc[]): converter => {
-    return (c: tkoolCommand[], d: number, e: Element, rps: rdmlParams) => {
+  const singleCommand = (code: number, descs: tkoolParamDesc[]): converter => {
+    return (c: tkoolCommand[], d: number, e: Element, v: rdmlValues) => {
       let p: Param[] = [];
       for (const desc of descs) {
-        p.push(rps[desc.ref].value);
+        p.push(v[desc.ref].params[0]);
       }
       c.push({
         code: code,
@@ -170,9 +170,14 @@ namespace rdml.eventcommands {
 
   interface Unit { }
 
+  interface subParamDesc {
+    attr: string;
+    unit: Unit;
+  }
+
   interface paramDesc {
     attr: string;
-    union: string[];
+    subs?: subParamDesc[];
     unit: Unit;
     default: Param | null;
   }
@@ -191,13 +196,16 @@ namespace rdml.eventcommands {
       params: [
         {
           attr: "time",
-          union: [],
           unit: rdml.units.id,
           default: REQUIRED,
         },
         // {
         //  attr: "actor",
-        //  union: ["hp", "mp", "tp"],
+        //  subs: [
+        //    { attr: "hp", unit: units.uint, },
+        //    { attr: "mp", unit: units.uint, },
+        //    { attr: "tp", unit: units.uint, },
+        //  ],
         //  unit: units.actorID,
         //  default: REQUIRED,
         // },
@@ -205,21 +213,44 @@ namespace rdml.eventcommands {
       convert: singleCommand(103, [
         { ref: "time" },
       ]),
+      // convert: singleCommand(103, [
+      //   { ref: "actor" },
+      // ]),
     }
   };
 
-  interface rdmlParam {
-    sub: string; // actually selected attr if union attr
-    value: Param;
-    values: Param[]; // can be array e.g. colors
+  interface rdmlValue {
+    sub: string; // actually described attr if sub attr
+    params: Param[]; // can be array e.g. colors
   }
 
-  type rdmlParams = { [attr: string]: rdmlParam };
+  type rdmlValues = { [attr: string]: rdmlValue };
 
-  function elem2params(el: Element) {
+  function elem2values(el: Element) {
     if (!(el.name in commandDescs)) {
       throw new Error(`unknown command "${el.name}"`);
     }
+    let values: rdmlValues = {};
     const desc = commandDescs[el.name]; // パラメータ変換の素
+
+    for (const param of desc.params) {
+      const attr = param.attr;
+      if (param.subs !== undefined) {
+        for (const sub of param.subs) {
+          if (sub.attr === attr) {
+            // value = sub.unit.validate[el.attrs[attr]];
+            const value: Param = 0;
+            values[attr] = {
+              sub: attr,
+              params: [value],
+            }
+          }
+        }
+      } else {
+
+      }
+    }
+
+    return values;
   }
 }
