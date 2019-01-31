@@ -88,7 +88,12 @@ namespace rdml.eventcommands {
     desc: string;
     key: string;
     attrs: { [name: string]: ValueType };
-    default: Param[] | null;
+    default: DefaultValue | null;
+  }
+
+  interface DefaultValue {
+    attr: string;
+    value: Param[];
   }
 
   type Processor = (c: Cmds, e: Element, a: Args, depth: number) => void;
@@ -200,7 +205,10 @@ namespace rdml.eventcommands {
             n: types.n,
             n_var: types.var,
           },
-          default: [1],
+          default: {
+            attr: "num",
+            value: [1],
+          },
         },
       ],
       process: toSingleCommand(320, []),
