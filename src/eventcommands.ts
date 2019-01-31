@@ -40,13 +40,13 @@ namespace rdml.eventcommands {
     let args: Args = {};
     const cmd = commandDescs[elem.name];
 
-    for (const attr of cmd.attrs) {
+    for (const attr of cmd.args) {
       if (attr.subs !== undefined) {
         continue;
       }
 
       // TODO extra keys check
-      const key = attr.key === undefined ? attr.typ.attr : attr.key;
+      const key = attr.key === undefined ? attr.typ.name : attr.key;
       if (attr.default === REQUIRED && !(key in elem.attrs)) {
         throw new Error(`attribute "${key}" required, but not found"`);
       }
@@ -54,7 +54,7 @@ namespace rdml.eventcommands {
         ? attr.typ.filter(elem.attrs[key]) : attr.default;
 
       args[key] = {
-        sub: "",
+        attr: "",
         values: values,
       };
     }
@@ -65,38 +65,98 @@ namespace rdml.eventcommands {
 
   interface CommandDesc {
     desc: string;
-    attrs: AttrDesc[];
+    args: ArgDesc[];
     process: Processor;
   }
 
-  interface AttrDesc {
+  interface ArgDesc {
+    desc: string;
     key?: string;
-    typ: ParamType;
-    subs?: SubAttrDesc[];
+    attrs: { [name: string]: ValueType };
     default: Param[] | null;
-  }
-
-  interface SubAttrDesc {
-    key: string;
-    typ: ParamType;
   }
 
   type Processor = (c: Cmds, e: Element, a: Args, depth: number) => void;
 
   interface Arg {
-    sub: string;
+    attr: string;
     values: Param[];
   }
 
-  type Args = { [attr: string]: Arg };
+  type Args = { [key: string]: Arg };
 
-  interface ParamType {
-    desc: string;
-    attr: string;
+  interface ValueType {
     filter: Filter;
+    desc: string;
   }
 
   type Filter = (src: string) => Param[];
 
-  const commandDescs: { [name: string]: CommandDesc } = {};
+  /*
+   * definitions
+   */
+
+  namespace f {
+    export function int(min: number | null, max: number | null): Filter {
+      return (src: string) => [check.int(src, min, max)];
+    }
+  }
+
+  const types: { [name: string]: ValueType } = {
+    time: {
+      filter: f.int(0, null),
+      desc: "フレーム数",
+    },
+    n: {
+      filter: f.int(0, null),
+      desc: "整数値",
+    },
+    "var": {
+      filter: f.int(0, null),
+      desc: "変数名",
+    },
+    actor: {
+      filter: f.int(0, null),
+      desc: "アクター名",
+    },
+  }
+
+  const commandDescs: { [name: string]: CommandDesc } = {
+    wait: {
+      desc: "指定時間待機します。",
+      args: [
+        {
+          desc: "待機時間",
+          attrs: { time: types.time },
+          default: REQUIRED,
+        },
+      ],
+      process: (c: Cmds, e: Element, a: Args, d: number) => { },
+    },
+
+    heal: {
+      desc: "アクターのパラメータを回復します。",
+      args: [
+        {
+          desc: "回復するパラメータの種類と対象アクター",
+          key: "actor",
+          attrs: {
+            hp: types.actor,
+            mp: types.actor,
+            tp: types.actor,
+          },
+          default: REQUIRED,
+        },
+        {
+          desc: "回復量 (直接指定 or 変数)",
+          attrs: {
+            n: types.n,
+            "var": types.var,
+          },
+          default: REQUIRED,
+        },
+      ],
+      process: (c: Cmds, e: Element, a: Args, d: number) => { },
+    },
+  };
 }
