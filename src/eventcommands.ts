@@ -27,8 +27,8 @@ namespace rdml.eventcommands {
   }
 
   function pushCommand(cmds: Cmds, elem: Element, depth: number) {
-    const desc = commandDescs[elem.name];
     const args = makeArgs(elem);
+    const desc = commandDescs[elem.name]; // already checked
     desc.process(cmds, elem, args, depth);
   }
 
@@ -40,24 +40,39 @@ namespace rdml.eventcommands {
     let args: Args = {};
     const cmd = commandDescs[elem.name];
 
-    for (const attr of cmd.args) {
-      if (attr.subs !== undefined) {
-        continue;
+    for (const argDesc of cmd.args) {
+      let typ: ValueType | null = null;
+      for (const attr in argDesc.attrs) {
+        if (attr in elem.attrs) {
+          typ = argDesc.attrs[attr];
+        }
       }
+      if (typ === null) { throw new Error(`unknown attribute`); }
 
-      // TODO extra keys check
-      const key = attr.key === undefined ? attr.typ.name : attr.key;
-      if (attr.default === REQUIRED && !(key in elem.attrs)) {
-        throw new Error(`attribute "${key}" required, but not found"`);
-      }
-      const values = (attr.default === REQUIRED || key in elem.attrs)
-        ? attr.typ.filter(elem.attrs[key]) : attr.default;
-
-      args[key] = {
+      args["hoge"] = {
         attr: "",
-        values: values,
-      };
+        values: typ.filter(elem.attrs["hoge"]),
+      }
     }
+    //
+    // for (const attr of cmd.args) {
+    //   if (attr.subs !== undefined) {
+    //     continue;
+    //   }
+    //
+    //   // TODO extra keys check
+    //   const key = attr.key === undefined ? attr.typ.name : attr.key;
+    //   if (attr.default === REQUIRED && !(key in elem.attrs)) {
+    //     throw new Error(`attribute "${key}" required, but not found"`);
+    //   }
+    //   const values = (attr.default === REQUIRED || key in elem.attrs)
+    //     ? attr.typ.filter(elem.attrs[key]) : attr.default;
+    //
+    //   args[key] = {
+    //     attr: "",
+    //     values: values,
+    //   };
+    // }
     return args;
   }
 
@@ -71,7 +86,7 @@ namespace rdml.eventcommands {
 
   interface ArgDesc {
     desc: string;
-    key?: string;
+    key: string;
     attrs: { [name: string]: ValueType };
     default: Param[] | null;
   }
@@ -95,6 +110,26 @@ namespace rdml.eventcommands {
   /*
    * definitions
    */
+
+  interface tkoolParamDesc {
+    key: string;
+    index?: number;
+  }
+
+  const toSingleCommand = (code: number, params: tkoolParamDesc[]): Processor => {
+    return (c: Cmds, e: Element, a: Args, d: number) => {
+      const result: Param[] = params.map<Param>((param) => {
+        const i = param.index === undefined ? 0 : param.index;
+        return a[param.key].values[i];
+      });
+
+      c.push({
+        code: code,
+        indent: d,
+        parameters: result,
+      });
+    }
+  }
 
   namespace f {
     export function int(min: number | null, max: number | null): Filter {
@@ -121,17 +156,28 @@ namespace rdml.eventcommands {
     },
   }
 
+  // utility
+  function appendTemp(a: Args, key: string, val: Param) {
+    a[key] = {
+      attr: "",
+      values: [val],
+    };
+  }
+
   const commandDescs: { [name: string]: CommandDesc } = {
     wait: {
       desc: "指定時間待機します。",
       args: [
         {
           desc: "待機時間",
+          key: "time",
           attrs: { time: types.time },
           default: REQUIRED,
         },
       ],
-      process: (c: Cmds, e: Element, a: Args, d: number) => { },
+      process: toSingleCommand(230, [
+        { key: "time" },
+      ]),
     },
 
     heal: {
@@ -149,6 +195,7 @@ namespace rdml.eventcommands {
         },
         {
           desc: "回復量 (直接指定 or 変数)",
+          key: "n",
           attrs: {
             n: types.n,
             "var": types.var,
@@ -156,7 +203,26 @@ namespace rdml.eventcommands {
           default: REQUIRED,
         },
       ],
-      process: (c: Cmds, e: Element, a: Args, d: number) => { },
+      process: (c: Cmds, e: Element, a: Args, d: number) => {
+        const code = ((): number => {
+          switch (a["actor"].attr) {
+            case "hp":
+              return 311;
+            case "mp":
+              return 312;
+          }
+          // case "tp":
+          return 326;
+        })();
+
+        appendTemp(a, "refers", a["n"].attr === "n_var" ? 1 : 0);
+
+        toSingleCommand(code, [
+          { key: "refers" },
+          { key: "actor" },
+          { key: "op" },
+        ])(c, e, a, d);
+      },
     },
   };
 }
