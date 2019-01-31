@@ -180,6 +180,32 @@ namespace rdml.eventcommands {
       ]),
     },
 
+    get: {
+      desc: "所持品を増やします。",
+      args: [
+        {
+          desc: "入手するものの種類と名前",
+          key: "target",
+          attrs: {
+            item: types.n,
+            weapon: types.n,
+            armor: types.n,
+          },
+          default: REQUIRED,
+        },
+        {
+          desc: "入手する数",
+          key: "num",
+          attrs: {
+            n: types.n,
+            n_var: types.var,
+          },
+          default: [1],
+        },
+      ],
+      process: toSingleCommand(320, []),
+    },
+
     heal: {
       desc: "アクターのパラメータを回復します。",
       args: [
