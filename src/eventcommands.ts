@@ -1,116 +1,83 @@
 /// <reference path="types.ts" />
 /// <reference path="check.ts" />
 
-namespace rdml.eventcommands {
+namespace rdml {
 
   type Cmds = EventCmd[];
 
-  export function execProc(i: Game_Interpreter, id: string) {
-    const cmds = procs[id].cmds;
-    i.setupChild(cmds, 0);
-  }
-
-  export function makeProc(elem: Element) {
-    const name = elem.attrs["name"];
-    procs[name] = new Proc(elem);
-  }
-
-  let procs: { [name: string]: Proc } = {};
-
-  class Proc {
-    cmds: Cmds = [];
-    constructor(root: Element) {
-      root.children.map((child) => {
-        pushCommand(this.cmds, child, 0);
-      });
-    }
-  }
-
-  function pushCommand(cmds: Cmds, elem: Element, depth: number) {
+  export function pushCommand(cmds: Cmds, elem: Element, depth: number) {
     const args = makeArgs(elem);
-    const desc = commandDescs[elem.name]; // already checked
+    const desc = commandDefs[elem.name]; // already checked
     desc.process(cmds, elem, args, depth);
   }
 
   function makeArgs(elem: Element) {
-    if (!(elem.name in commandDescs)) {
+    if (!(elem.name in commandDefs)) {
       throw new Error(`unknown command "${elem.name}"`);
     }
 
     let args: Args = {};
-    const cmd = commandDescs[elem.name];
+    const cmd = commandDefs[elem.name];
 
-    for (const argDesc of cmd.args) {
-      let typ: ValueType | null = null;
-      for (const attr in argDesc.attrs) {
+    for (const argdef of cmd.args) {
+      let typ: definition.ValueType | null = null;
+      let selectedattr: string = "";
+      let key: string = argdef.key === undefined ? "" : argdef.key;
+
+      const attrsdef = argdef.attrs;
+      for (const attr in attrsdef) {
         if (attr in elem.attrs) {
-          typ = argDesc.attrs[attr];
+          typ = attrsdef[attr];
         }
       }
-      if (typ === null) { throw new Error(`unknown attribute`); }
 
-      args["hoge"] = {
-        attr: "",
-        values: typ.filter(elem.attrs["hoge"]),
-      }
+      if (typ === null) { continue; }
+
+      args[key] = new Arg(selectedattr, typ.filter(elem.attrs[selectedattr]));
     }
-    //
-    // for (const attr of cmd.args) {
-    //   if (attr.subs !== undefined) {
-    //     continue;
-    //   }
-    //
-    //   // TODO extra keys check
-    //   const key = attr.key === undefined ? attr.typ.name : attr.key;
-    //   if (attr.default === REQUIRED && !(key in elem.attrs)) {
-    //     throw new Error(`attribute "${key}" required, but not found"`);
-    //   }
-    //   const values = (attr.default === REQUIRED || key in elem.attrs)
-    //     ? attr.typ.filter(elem.attrs[key]) : attr.default;
-    //
-    //   args[key] = {
-    //     attr: "",
-    //     values: values,
-    //   };
-    // }
     return args;
   }
 
   const REQUIRED = null;
 
-  interface CommandDesc {
-    desc: string;
-    args: ArgDesc[];
-    process: Processor;
+  namespace definition {
+    export interface Command {
+      desc: string;
+      args: Arg[];
+      process: Processor;
+    }
+
+    export interface Arg {
+      desc: string;
+      key?: string;
+      attrs: { [name: string]: ValueType };
+      follows?: any[];
+      default: DefaultValue | null;
+    }
+
+    export interface ValueType {
+      filter: Filter;
+      desc: string;
+    }
+
+    export interface DefaultValue {
+      attr: string;
+      value: string;
+    }
   }
 
-  interface ArgDesc {
-    desc: string;
-    key: string;
-    attrs: { [name: string]: ValueType };
-    default: DefaultValue | null;
-  }
+  export type Filter = (src: string) => Param[];
 
-  interface DefaultValue {
-    attr: string;
-    value: Param[];
-  }
+  export type Processor = (c: Cmds, e: Element, a: Args, depth: number) => void;
 
-  type Processor = (c: Cmds, e: Element, a: Args, depth: number) => void;
-
-  interface Arg {
-    attr: string;
-    values: Param[];
+  class Arg {
+    constructor(
+      public attr: string,
+      public values: Param[],
+    ) { }
   }
 
   type Args = { [key: string]: Arg };
-
-  interface ValueType {
-    filter: Filter;
-    desc: string;
-  }
-
-  type Filter = (src: string) => Param[];
 
   /*
    * definitions
@@ -121,7 +88,7 @@ namespace rdml.eventcommands {
     index?: number;
   }
 
-  const toSingleCommand = (code: number, params: tkoolParamDesc[]): Processor => {
+  const pushSingleCommand = (code: number, params: tkoolParamDesc[]): Processor => {
     return (c: Cmds, e: Element, a: Args, d: number) => {
       const result: Param[] = params.map<Param>((param) => {
         const i = param.index === undefined ? 0 : param.index;
@@ -140,9 +107,13 @@ namespace rdml.eventcommands {
     export function int(min: number | null, max: number | null): Filter {
       return (src: string) => [check.int(src, min, max)];
     }
+
+    export function bool(): Filter {
+      return (src: string) => [1];
+    }
   }
 
-  const types: { [name: string]: ValueType } = {
+  const types: { [name: string]: definition.ValueType } = {
     time: {
       filter: f.int(0, null),
       desc: "フレーム数",
@@ -159,6 +130,10 @@ namespace rdml.eventcommands {
       filter: f.int(0, null),
       desc: "アクター名",
     },
+    bool: {
+      filter: f.bool(),
+      desc: "真偽値",
+    },
   }
 
   // utility
@@ -169,7 +144,7 @@ namespace rdml.eventcommands {
     };
   }
 
-  const commandDescs: { [name: string]: CommandDesc } = {
+  const commandDefs: { [name: string]: definition.Command } = {
     wait: {
       desc: "指定時間待機します。",
       args: [
@@ -180,7 +155,7 @@ namespace rdml.eventcommands {
           default: REQUIRED,
         },
       ],
-      process: toSingleCommand(230, [
+      process: pushSingleCommand(230, [
         { key: "time" },
       ]),
     },
@@ -207,11 +182,11 @@ namespace rdml.eventcommands {
           },
           default: {
             attr: "num",
-            value: [1],
+            value: "0",
           },
         },
       ],
-      process: toSingleCommand(320, []),
+      process: pushSingleCommand(320, []),
     },
 
     heal: {
@@ -221,9 +196,9 @@ namespace rdml.eventcommands {
           desc: "回復するパラメータの種類と対象アクター",
           key: "actor",
           attrs: {
-            hp: types.actor,
-            mp: types.actor,
-            tp: types.actor,
+            hpof: types.actor,
+            mpof: types.actor,
+            tpof: types.actor,
           },
           default: REQUIRED,
         },
@@ -232,9 +207,19 @@ namespace rdml.eventcommands {
           key: "n",
           attrs: {
             n: types.n,
-            "var": types.var,
+            n_var: types.var,
           },
           default: REQUIRED,
+        },
+        {
+          desc: "戦闘不能時の回復が可能か",
+          attrs: {
+            revive: types.bool,
+          },
+          follows: [
+            { key: "actor", attr: "hpof" },
+          ],
+          default: { attr: "revive", value: "false" },
         },
       ],
       process: (c: Cmds, e: Element, a: Args, d: number) => {
@@ -251,7 +236,7 @@ namespace rdml.eventcommands {
 
         appendTemp(a, "refers", a["n"].attr === "n_var" ? 1 : 0);
 
-        toSingleCommand(code, [
+        pushSingleCommand(code, [
           { key: "refers" },
           { key: "actor" },
           { key: "op" },
