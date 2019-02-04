@@ -6,12 +6,12 @@ namespace rdml {
   type Cmds = EventCmd[];
 
   export function pushCommand(cmds: Cmds, elem: Element, depth: number) {
-    const args = makeArgs(elem);
+    const args = createArgs(elem);
     const desc = commandDefs[elem.name]; // already checked
     desc.process(cmds, elem, args, depth);
   }
 
-  function makeArgs(elem: Element) {
+  function createArgs(elem: Element) {
     if (!(elem.name in commandDefs)) {
       throw new Error(`unknown command "${elem.name}"`);
     }
