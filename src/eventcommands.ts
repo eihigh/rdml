@@ -25,13 +25,12 @@ namespace rdml {
           : Object.keys(arg.attrs).length === 1 ? Object.keys(arg.attrs)[0]
             : null
 
-      if (key === null) { throw new Error(`must key`); }
+      if (key === null) { throw new Error(`invalid definition: key-omitted arg requires only one attr`); }
 
       const attr = findAttr(elem, arg);
       if (attr === null) { continue; }
 
-      const typ = arg.attrs[attr];
-      args[key] = new Arg(attr, typ.filter(elem.attrs[attr]));
+      args[key] = new Arg(attr, arg.attrs[attr].filter(elem.attrs[attr]));
     }
     return args;
   }
@@ -155,7 +154,6 @@ namespace rdml {
       args: [
         {
           desc: "待機時間",
-          key: "time",
           attrs: { time: types.time },
           default: REQUIRED,
         },
@@ -180,15 +178,12 @@ namespace rdml {
         },
         {
           desc: "入手する数",
-          key: "num",
+          key: "n",
           attrs: {
             n: types.n,
             n_var: types.var,
           },
-          default: {
-            attr: "num",
-            value: "0",
-          },
+          default: { attr: "n", value: "1", },
         },
       ],
       process: pushSingleCommand(320, []),
@@ -224,7 +219,7 @@ namespace rdml {
           follows: [
             { key: "actor", attr: "hpof" },
           ],
-          default: { attr: "revive", value: "false" },
+          default: { attr: "revive", value: "no" },
         },
       ],
       process: (c: Cmds, e: Element, a: Args, d: number) => {
