@@ -19,21 +19,21 @@ namespace rdml {
     let args: Args = {};
     const cmd = commandDefs[elem.name];
 
-    for (const argdef of cmd.args) {
+    for (const arg of cmd.args) {
+      const key: string = arg.key === undefined ? "" : arg.key;
       let typ: definition.ValueType | null = null;
-      let selectedattr: string = "";
-      let key: string = argdef.key === undefined ? "" : argdef.key;
+      let attr: string = "";
 
-      const attrsdef = argdef.attrs;
-      for (const attr in attrsdef) {
-        if (attr in elem.attrs) {
-          typ = attrsdef[attr];
+      for (const attrName in arg.attrs) {
+        if (attrName in elem.attrs) {
+          typ = arg.attrs[attrName];
+          attr = attrName;
         }
       }
 
       if (typ === null) { continue; }
 
-      args[key] = new Arg(selectedattr, typ.filter(elem.attrs[selectedattr]));
+      args[key] = new Arg(attr, typ.filter(elem.attrs[attr]));
     }
     return args;
   }
